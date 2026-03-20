@@ -1069,7 +1069,7 @@ function sendAIMessageFromChip(text) {
 function openAIChatWhatsApp() {
     const phoneNumber = "918391921082";
     const message = encodeURIComponent("হ্যালো, আমার Pikko Shorts অ্যাপে সাহায্য প্রয়োজন।");
-    window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+    window.location.href = `https://wa.me/${phoneNumber}?text=${message}`;
 }
 
 function processAIMessage() {
@@ -1437,7 +1437,7 @@ async function withdrawPcoins() {
     
     const message = `🔹 *Pikko Shorts Withdrawal Request* 🔹\n\n👤 *User:* ${user.name} (${user.username})\n💵 *Withdraw Amount:* ₹${rupees} (${coinsToDeduct} P Coins)\n💰 *Remaining Balance:* ${user.pCoinBalance}\n📅 *Date:* ${new Date().toLocaleDateString()}\n\nPlease process the withdrawal. Thank you!`;
     
-    window.open(`https://wa.me/${WITHDRAW_WHATSAPP}?text=${encodeURIComponent(message)}`, '_blank');
+    window.location.href = `https://wa.me/${WITHDRAW_WHATSAPP}?text=${encodeURIComponent(message)}`;
     showToast('Withdrawal successful! Coins deducted.');
     renderProfile();
 }
@@ -3304,7 +3304,7 @@ function sendTxnIdToAdmin() {
     const user = getActiveUser();
     const msg = `*Exchange Limit Unlock Request*\n\nUser: ${user.name} (${user.username})\nAmount: ₹50\nUPI ID Paid To: 8391921082@ibl\nTxn ID: ${txnId}\n\nPlease verify and send my 6-digit coupon code.`;
 
-    window.open(`https://wa.me/918391921082?text=${encodeURIComponent(msg)}`, '_blank');
+    window.location.href = `https://wa.me/918391921082?text=${encodeURIComponent(msg)}`;
     showToast('Redirecting to WhatsApp...');
 }
 
