@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pikko Shorts - Premium</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+    <div id="globalLoader" class="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text" id="loaderText">Loading...</div>
+    </div>
+
+    <div class="toast-message" id="toastMessage"></div>
+
+    <div id="offlineBanner" class="offline-banner" style="display: none;">
+        <i class="fas fa-wifi-slash"></i> No internet connection
+        <button onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+    </div>
+<div id="floatingStarContainer" style="display: none;">
+    <svg class="progress-ring" width="50" height="50">
+        <circle class="progress-ring__circle" stroke="#ffd700" stroke-width="4" fill="transparent" r="21" cx="25" cy="25"/>
+    </svg>
+    <div class="floating-star-icon">
+        <i class="fas fa-star" style="color: #ffd700;"></i>
+    </div>
+    <div id="floatingStarText">0/50</div>
+</div>
+    <div id="mainContent" class="content-area"></div>
+
+    <div class="side-menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
+    
+    <div class="side-menu" id="sideMenu">
+        <h3 style="margin-bottom: 25px; padding-left: 10px; border-bottom: 1px solid var(--border); padding-bottom: 18px; display: flex; align-items: center; gap: 10px;">
+            <i class="fas fa-user-circle" style="font-size: 28px; color: var(--primary);"></i> Menu
+        </h3>
+        <div class="menu-item" onclick="openEditModal()">
+            <i class="fas fa-user-edit"></i> Edit Profile
+        </div>
+        <div class="menu-item" onclick="renderVerificationInfo()">
+            <i class="fas fa-check-circle"></i> Verification
+        </div>
+        <div class="menu-item" onclick="renderLeaderboard()">
+            <i class="fas fa-trophy"></i> Leaderboard
+        </div>
+        <div class="menu-item" onclick="renderPlaylists()">
+            <i class="fas fa-list"></i> My Playlists
+        </div>
+        <div class="menu-item" onclick="shareProfile()">
+            <i class="fas fa-share-alt"></i> Share Profile
+        </div>
+        <div class="menu-item" onclick="referEarn()">
+            <i class="fas fa-user-friends"></i> Refer & Earn
+        </div>
+        <div class="menu-item" onclick="openBackupRestore()">
+            <i class="fas fa-database"></i> Backup / Restore
+        </div>
+        <div class="menu-item" onclick="toggleTheme()">
+            <i class="fas fa-moon" id="themeIcon"></i> 
+            <span id="themeText">Dark Mode</span>
+            <span style="margin-left:auto;" id="themeToggle">🌙</span>
+        </div>
+        <div class="menu-item" onclick="openAdminPanel()">
+            <i class="fas fa-user-shield"></i> Admin Panel
+        </div>
+        <div class="menu-item" onclick="goOffline()">
+            <i class="fas fa-cloud-download-alt"></i> Offline Videos
+        </div>
+        <div class="menu-item" onclick="handleLogout()" style="color: #fe2c55; margin-top: auto; border-top: 1px solid var(--border);">
+            <i class="fas fa-sign-out-alt"></i> Log Out
+        </div>
+    </div>
+
+    <div id="editModal" class="modal-overlay">
+        <div class="bottom-modal" style="height: auto; padding: 20px;">
+            <h3 style="text-align:center; margin-bottom:25px;">Edit Profile</h3>
+            <div class="edit-pic-wrapper" onclick="document.getElementById('editFile').click()">
+                <div id="previewPic" class="edit-pic"></div>
+                <div style="position:absolute; bottom:0; right:0; background:var(--primary); border-radius:50%; width:35px; height:35px; display:flex; justify-content:center; align-items:center;">
+                    <i class="fas fa-camera"></i>
+                </div>
+            </div>
+            <input type="file" id="editFile" hidden accept="image/*" onchange="previewImage(this)">
+            <input type="text" id="editName" class="input-field" placeholder="Full Name">
+            <input type="text" id="editUsername" class="input-field" placeholder="Username (without @)">
+            <input type="text" id="editBio" class="input-field" placeholder="Bio">
+            <button class="primary-btn" onclick="saveProfileChanges()">Save</button>
+            <button class="primary-btn" style="background:#444; margin-top:10px;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button>
+        </div>
+    </div>
+
+    <div id="playlistModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal">
+            <div class="user-list-header">
+                <span id="playlistTitle">Create Playlist</span>
+                <i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('playlistModal').style.display='none'"></i>
+            </div>
+            <div class="user-list-content" id="playlistContent">
+                <input type="text" id="playlistName" class="input-field" placeholder="Playlist Name">
+                <button class="primary-btn" onclick="createPlaylist()">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="videoMenuModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal">
+            <div class="user-list-header">
+                <span>Video Options</span>
+                <i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('videoMenuModal').style.display='none'"></i>
+            </div>
+            <div class="user-list-content" id="videoMenuContent"></div>
+        </div>
+    </div>
+
+    <div id="userListModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal">
+            <div class="user-list-header">
+                <span id="listTitle">List</span>
+                <i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('userListModal').style.display='none'"></i>
+            </div>
+            <div class="user-list-content" id="listContent"></div>
+        </div>
+    </div>
+
+    <div id="commentModal" class="modal-overlay" onclick="if(event.target===this)closeComments()">
+        <div class="bottom-modal">
+            <div style="padding:18px; text-align:center; border-bottom:1px solid var(--border); font-weight:bold; font-size:18px;">
+                Comments <span id="commentCount">(0)</span>
+                <i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="closeComments()"></i>
+            </div>
+            <div class="comment-list" id="commentList" style="flex:1; overflow-y:auto; padding:15px;"></div>
+            <div style="padding:15px; display:flex; gap:10px; border-top:1px solid var(--border); background:var(--bg);">
+                <input type="text" id="commentInput" style="flex:1; background:var(--input-bg); border:none; padding:12px; color:var(--text); border-radius:30px; outline:none;" placeholder="Add a comment...">
+                <button onclick="postComment()" style="color:white; background:var(--primary); font-weight:bold; border:none; padding:10px 20px; border-radius:30px; cursor:pointer;">Post</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="videoViewerModal" class="modal-overlay">
+        <i class="fas fa-times viewer-close" onclick="closeVideoViewer()"></i>
+        <video id="fullScreenVideo" class="viewer-video" controls autoplay></video>
+    </div>
+
+    <div id="giftModal" class="modal-overlay">
+        <div class="bottom-modal gift-modal">
+            <div class="gift-header">
+                <span>Send Stars to <span id="giftCreator"></span></span>
+                <i class="fas fa-times" onclick="document.getElementById('giftModal').style.display='none'"></i>
+            </div>
+            <div class="gift-content">
+                <div class="gift-balance">Your Stars: <span id="senderStarBalance">0</span> ⭐</div>
+                <div class="gift-packages">
+                    <div class="gift-package" data-stars="1" onclick="selectGiftPackage(1)">1 ⭐</div>
+                    <div class="gift-package" data-stars="5" onclick="selectGiftPackage(5)">5 ⭐</div>
+                    <div class="gift-package" data-stars="10" onclick="selectGiftPackage(10)">10 ⭐</div>
+                    <div class="gift-package" data-stars="20" onclick="selectGiftPackage(20)">20 ⭐</div>
+                    <div class="gift-package" data-stars="50" onclick="selectGiftPackage(50)">50 ⭐</div>
+                </div>
+                <div class="gift-custom">
+                    <input type="range" id="giftSlider" min="1" max="100" value="1" oninput="updateGiftSlider()">
+                    <div class="gift-slider-value"><span id="giftSliderValue">1</span> ⭐</div>
+                </div>
+                <button class="gift-send-btn" onclick="sendGift()">Send Stars</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="verificationModal" class="modal-overlay">
+        <div class="bottom-modal verification-modal">
+            <div class="verification-header">
+                <h2>Verification Status</h2>
+                <p>Complete requirements to unlock badges</p>
+                <i class="fas fa-times" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:20px; color:var(--muted-text);" onclick="document.getElementById('verificationModal').style.display='none'"></i>
+            </div>
+            <div class="verification-grid" id="userVerificationDetails">
+                Loading...
+            </div>
+            <div class="verification-footer">
+                <i class="fas fa-info-circle"></i> Badges are automatically unlocked when requirements are met
+            </div>
+        </div>
+    </div>
+
+    <div id="cameraOptionsModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="camera-options-modal">
+            <h3 style="text-align:center; margin-bottom:20px; color: var(--text);">Upload Video</h3>
+            <div class="camera-option-btn" onclick="openCamera('environment')">
+                <i class="fas fa-camera"></i>
+                <span>Record with Camera</span>
+            </div>
+            <div class="camera-option-btn" onclick="openCamera('user')">
+                <i class="fas fa-camera-retro"></i>
+                <span>Take Selfie Video</span>
+            </div>
+            <div class="camera-option-btn" onclick="openGallery()">
+                <i class="fas fa-images"></i>
+                <span>Choose from Gallery</span>
+            </div>
+            <div class="camera-close-btn" onclick="document.getElementById('cameraOptionsModal').style.display='none'">
+                Cancel
+            </div>
+        </div>
+    </div>
+
+    <div id="leaderboardModal" class="modal-overlay" style="z-index: 6000;">
+        <div class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;">
+            <div style="padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 22px 22px 0 0; position: relative;">
+                <h2 style="margin: 0; font-size: 22px; text-align: center;"><i class="fas fa-trophy" style="color:#ffd700;"></i> Top P-Coin Collectors</h2>
+                <i class="fas fa-times" style="position: absolute; right: 20px; top: 22px; font-size: 24px; cursor: pointer;" onclick="document.getElementById('leaderboardModal').style.display='none'"></i>
+            </div>
+            <div id="leaderboardContent" style="flex: 1; overflow-y: auto; padding: 15px; background: var(--bg);"></div>
+        </div>
+    </div>
+
+    <div id="chatModal" class="modal-overlay" style="z-index: 6000;">
+        <div class="bottom-modal" style="height: 85vh; display: flex; flex-direction: column; background: var(--bg);">
+            
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; background: var(--secondary-bg);">
+                <i class="fas fa-arrow-left" style="font-size: 20px; cursor: pointer; color: var(--text);" onclick="closeChat()"></i>
+                <div id="chatUserAvatar" style="width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;"></div>
+                <div style="flex: 1;">
+                    <div id="chatUserName" style="font-weight: bold; font-size: 16px; color: var(--text);">Name</div>
+                    <div id="chatUserHandle" style="font-size: 12px; color: var(--muted-text);">@username</div>
+                </div>
+            </div>
+
+            <div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px;">
+                </div>
+
+            <div style="padding: 12px 15px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--secondary-bg);">
+                <input type="text" id="chatInput" placeholder="Type a message..." style="flex: 1; background: var(--input-bg); border: 1px solid var(--border); padding: 12px 18px; border-radius: 25px; color: var(--text); outline: none; font-size: 14px;">
+                <button onclick="sendMessage()" style="background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 10px var(--primary-glow);">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="renderHome()"><i class="fas fa-home"></i><span>Home</span></div>
+        <div class="nav-item" onclick="renderExplore()"><i class="fas fa-search"></i><span>Explore</span></div>
+        <div class="nav-item" onclick="showCameraOptions()">
+            <div class="camera-btn-nav"><i class="fas fa-camera"></i></div>
+        </div>
+        <div class="nav-item" onclick="renderNotify()"><i class="fas fa-bell"></i><span>Notify</span></div>
+        <div class="nav-item" onclick="renderProfile()"><i class="fas fa-user"></i><span>Profile</span></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let adTriggerCount = 0;
+            let watchedHistory = JSON.parse(localStorage.getItem('pikko_watched_history')) || [];
+
+            // এই সিস্টেমটি ভিডিও অটো-প্লে, পজ এবং অ্যাড কাউন্ট করবে
+            const smartVideoController = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target;
+                    
+                    if (entry.isIntersecting) {
+                        // ১. ভিডিও স্ক্রিনে আসলে অটো-প্লে হবে
+                        let playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(error => {
+                                console.log("Autoplay waiting for interaction");
+                            });
+                        }
+
+                        // ২. অ্যাড ট্র্যাকিং এবং হিস্ট্রি সেভ (শুধু নতুন ভিডিওর জন্য)
+                        let vidSrc = video.src || (video.querySelector('source') ? video.querySelector('source').src : '');
+                        if (vidSrc && !video.dataset.adCounted) {
+                            video.dataset.adCounted = "true";
+                            adTriggerCount++;
+                            
+                            if(!watchedHistory.includes(vidSrc)) {
+                                watchedHistory.push(vidSrc);
+                                if(watchedHistory.length > 500) watchedHistory.shift();
+                                localStorage.setItem('pikko_watched_history', JSON.stringify(watchedHistory));
+                            }
+
+                            // ৩টি ভিডিও প্লে হওয়ার পর অ্যাড
+                            if (adTriggerCount > 0 && adTriggerCount % 3 === 0) {
+                                if (window.AndroidBridge && typeof window.AndroidBridge.showInterAd === 'function') {
+                                    window.AndroidBridge.showInterAd();
+                                }
+                            }
+                        }
+                    } else {
+                        // ভিডিও স্ক্রিন থেকে সরে গেলে অটো-পজ হবে
+                        video.pause();
+                    }
+                });
+            }, { threshold: 0.6 }); // ভিডিওর ৬০% দেখা গেলেই প্লে হবে
+
+            // নতুন ভিডিও পেজে যোগ হলে সেগুলোকে কন্ট্রোলারে দেওয়া
+            const contentContainer = document.getElementById('mainContent');
+            if (contentContainer) {
+                const contentWatcher = new MutationObserver(() => {
+                    const allVideos = contentContainer.querySelectorAll('video');
+                    allVideos.forEach(v => {
+                        let vidSrc = v.src || (v.querySelector('source') ? v.querySelector('source').src : null);
+                        
+                        // নতুন ভিডিওতে অটো-প্লে এবং অ্যাড কন্ট্রোলার যুক্ত করা
+                        if (!v.dataset.isObserved) {
+                            v.setAttribute('playsinline', '');
+                            v.setAttribute('webkit-playsinline', '');
+                            v.loop = true; // ভিডিও লুপ হবে
+                            smartVideoController.observe(v);
+                            v.dataset.isObserved = "true";
+                        }
+                    });
+                });
+                contentWatcher.observe(contentContainer, { childList: true, subtree: true });
+            }
+        });
+    </script>
+</body>
+</html>
