@@ -996,26 +996,49 @@ function getAIResponse(question) {
 }
 
 // ========================================
-// PART 9: PROFILE & DAILY STARS (FIXED)
+// PART 9: PROFILE & DAILY STARS (COMPLETE)
 // ========================================
+
 async function renderProfile() { 
     updateNavActive('Profile'); 
     showLoader("Loading Profile..."); 
     const user = getActiveUser(); 
     if (!user) { renderAuth(); return; } 
     checkAndResetDailyStars(user); 
+    
     try { 
+        // Firebase থেকে লেটেস্ট ফলোয়ার/ফলোইং ডাটা নিন
+        let followers = user.followers || [];
+        let following = user.following || [];
+        
+        try {
+            const userDoc = await db.collection('users').doc(user.username).get();
+            if (userDoc.exists) {
+                followers = userDoc.data().followers || [];
+                following = userDoc.data().following || [];
+                user.followers = followers;
+                user.following = following;
+                saveUser(user);
+            }
+        } catch(e) {
+            console.log("Firebase fetch error:", e);
+        }
+        
         const transactions = user.transactions || []; 
         hideLoader(); 
+        
         const letter = user.username ? user.username.replace('@', '').charAt(0).toUpperCase() : 'U'; 
         const col = stringToColor(user.username); 
+        
         let verificationBadge = ''; 
         if (user.verification === 'blue') verificationBadge = '<div class="modern-verification-badge verification-blue"><i class="fas fa-crown"></i></div>'; 
         else if (user.verification === 'gray') verificationBadge = '<div class="modern-verification-badge verification-gray"><i class="fas fa-shield-alt"></i></div>'; 
         else if (user.verification === 'white') verificationBadge = '<div class="modern-verification-badge verification-white"><i class="fas fa-check"></i></div>'; 
+        
         const avatarStyle = user.profilePic ? `background-image:url('${user.profilePic}'); background-size:cover; background-position:center;` : `background:${col}; display:flex; align-items:center; justify-content:center;`; 
         const avatarContent = user.profilePic ? '' : letter; 
         const dailyStarsHtml = renderDailyStarsUI(user); 
+        
         let transactionsHtml = ''; 
         if (transactions.length > 0) { 
             transactions.slice(0, 10).forEach(t => { 
@@ -1024,19 +1047,393 @@ async function renderProfile() {
         } else { 
             transactionsHtml = '<p style="text-align:center; padding:20px; color:var(--muted-text);">No transactions yet</p>'; 
         } 
+        
         let totalMoney = ((user.pCoinBalance || 0) * 0.1).toFixed(2); 
         let lifetimePcoins = user.pCoinBalance || 0; 
         if (transactions && transactions.length > 0) { 
             let earned = transactions.filter(t => t.type === 'received').reduce((sum, t) => sum + (t.amount || 0), 0); 
             if (earned > lifetimePcoins) lifetimePcoins = earned; 
-        } 
-        contentDiv.innerHTML = `<div class="page-container"><div class="profile-header" style="position: relative;"><button onclick="openExchangeModal()" style="position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; border: 2px solid rgba(255,255,255,0.5); padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5); cursor: pointer; display: flex; align-items: center; gap: 5px; z-index: 10;"><i class="fas fa-exchange-alt"></i> Exchange</button><div class="profile-avatar-wrapper" style="position: relative; width: 120px; height: 120px; margin: 0 auto 15px;"><div class="profile-avatar-lg" style="${avatarStyle} width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover;">${avatarContent}</div>${verificationBadge}</div><h2 style="font-size:24px;">${escapeHtml(user.name || user.username)}</h2><p style="opacity:0.9;">${user.username}</p><p style="font-size:14px; margin-top:5px;">${escapeHtml(user.bio || "No Bio")}</p><div class="stats-row"><div class="stat-box"><span class="stat-num">${formatNumber(lifetimePcoins)}</span><span class="stat-label">Total P Coin</span></div><div class="stat-box"><span class="stat-num">${formatNumber(user.starBalance || 0)}</span><span class="stat-label">Stars</span></div><div class="stat-box"><span class="stat-num">₹${totalMoney}</span><span class="stat-label">Current Value</span></div></div><button class="primary-btn" style="width:auto; padding:10px 35px; background:#333;" onclick="openEditModal()">Edit Profile</button></div><div class="wallet-profile-container"><div class="wallet-balance-card"><div class="balance-label">P Coin Balance</div><div class="balance-amount" id="profilePcoinBalance">${user.pCoinBalance || 0}</div><div style="margin-top: 10px; font-size: 14px; opacity: 0.8;"><i class="fas fa-star" style="color: #ffd700;"></i> Stars: ${formatNumber(user.starBalance || 0)}</div></div><div class="daily-stars-section"><div class="section-title">Daily Stars</div><div class="daily-star-grid" id="profileDailyStarContainer">${dailyStarsHtml}</div></div><div class="withdraw-btn-modern" onclick="withdrawPcoins()"><div class="withdraw-btn-left"><div class="withdraw-icon"><i class="fas fa-wallet"></i></div><div class="withdraw-text"><h4>WITHDRAW</h4><p><i class="fab fa-whatsapp"></i> 1000 P Coin = ₹100</p></div></div><div class="withdraw-arrow"><i class="fas fa-arrow-right"></i></div></div><div class="transaction-history"><div class="section-title" style="margin-bottom: 15px;"><i class="fas fa-history"></i> Recent Transactions</div>${transactionsHtml}</div></div></div>`; 
+        }
+        
+        // ভিআইপি স্ট্যাটাস চেক
+        const isVipActive = user.vip && user.vip.expiryDate > Date.now();
+        
+        // পোস্ট কাউন্টের জন্য ভিডিও সংখ্যা
+        let postCount = 0;
+        try {
+            const videosSnapshot = await db.collection('videos').where('username', '==', user.username).get();
+            postCount = videosSnapshot.size;
+        } catch(e) {
+            console.log("Error loading post count:", e);
+        }
+        
+        contentDiv.innerHTML = `
+            <div class="page-container">
+                <!-- Profile Header -->
+                <div class="profile-header" style="position: relative;">
+                    <button onclick="openExchangeModal()" style="position: absolute; top: 20px; right: 20px; background: linear-gradient(135deg, #ffd700, #ff8c00); color: #000; border: 2px solid rgba(255,255,255,0.5); padding: 6px 14px; border-radius: 20px; font-weight: 800; font-size: 12px; box-shadow: 0 4px 15px rgba(255, 215, 0, 0.5); cursor: pointer; display: flex; align-items: center; gap: 5px; z-index: 10;">
+                        <i class="fas fa-exchange-alt"></i> Exchange
+                    </button>
+                    
+                    <!-- Avatar -->
+                    <div class="profile-avatar-wrapper" style="position: relative; width: 120px; height: 120px; margin: 0 auto 15px;">
+                        <div class="profile-avatar-lg" style="${avatarStyle} width: 120px; height: 120px; border-radius: 50%; border: 3px solid var(--primary); object-fit: cover;">
+                            ${avatarContent}
+                        </div>
+                        ${verificationBadge}
+                        ${isVipActive ? `<div class="vip-avatar-badge" style="position: absolute; bottom: 0; right: 0; background: linear-gradient(135deg, #f1c40f, #e67e22); width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg);"><i class="fas fa-crown" style="font-size: 14px; color: #000;"></i></div>` : ''}
+                    </div>
+                    
+                    <!-- User Info -->
+                    <h2 style="font-size:24px;">${escapeHtml(user.name || user.username)}</h2>
+                    <p style="opacity:0.9;">${user.username}</p>
+                    <p style="font-size:14px; margin-top:5px;">${escapeHtml(user.bio || "No Bio")}</p>
+                    
+                    <!-- Stats Row: Posts, Followers, Following -->
+                    <div class="profile-stats-row">
+                        <div class="profile-stat-box" onclick="viewUserPosts('${user.username}')">
+                            <span class="profile-stat-number" id="profilePostsCount">${postCount}</span>
+                            <span class="profile-stat-label">Posts</span>
+                        </div>
+                        <div class="profile-stat-box" onclick="viewUserFollowers('${user.username}')">
+                            <span class="profile-stat-number" id="profileFollowersCount">${followers.length}</span>
+                            <span class="profile-stat-label">Followers</span>
+                        </div>
+                        <div class="profile-stat-box" onclick="viewUserFollowing('${user.username}')">
+                            <span class="profile-stat-number" id="profileFollowingCount">${following.length}</span>
+                            <span class="profile-stat-label">Following</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Edit Profile Button -->
+                    <button class="primary-btn" style="width:auto; padding:10px 35px; background:#333; margin-top: 10px;" onclick="openEditModal()">Edit Profile</button>
+                    
+                    <!-- VIP Button -->
+                    <button id="profileVipBtnModern" onclick="openVipModal()" 
+                        class="vip-profile-btn-modern ${isVipActive ? 'vip-active-btn' : ''}"
+                        style="background: ${isVipActive ? 'linear-gradient(135deg, #f1c40f, #e67e22)' : 'linear-gradient(135deg, #333, #222)'}; 
+                        width: 90%;
+                        max-width: 280px;
+                        margin: 15px auto 0;
+                        padding: 12px 20px;
+                        border: ${isVipActive ? '2px solid #ffd700' : '1px solid #444'};
+                        border-radius: 50px;
+                        font-weight: bold;
+                        font-size: 15px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        gap: 10px;
+                        cursor: pointer;
+                        transition: all 0.3s ease;
+                        color: ${isVipActive ? '#000' : '#fff'};
+                        box-shadow: ${isVipActive ? '0 8px 20px rgba(241,196,15,0.4)' : 'none'};">
+                        <i class="fas fa-crown" style="font-size: 18px; color: ${isVipActive ? '#ffd700' : '#f1c40f'}"></i>
+                        <span>${isVipActive ? `🎖️ ${user.vip.planName} Active` : '✨ VIP Membership ✨'}</span>
+                        <i class="fas fa-chevron-right" style="font-size: 12px;"></i>
+                    </button>
+                </div>
+                
+                <!-- Wallet Section -->
+                <div class="wallet-profile-container">
+                    <div class="wallet-balance-card">
+                        <div class="balance-label">P Coin Balance</div>
+                        <div class="balance-amount" id="profilePcoinBalance">${user.pCoinBalance || 0}</div>
+                        <div style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
+                            <i class="fas fa-star" style="color: #ffd700;"></i> Stars: ${formatNumber(user.starBalance || 0)}
+                        </div>
+                    </div>
+                    
+                    <!-- Daily Stars -->
+                    <div class="daily-stars-section">
+                        <div class="section-title">Daily Stars</div>
+                        <div class="daily-star-grid" id="profileDailyStarContainer">${dailyStarsHtml}</div>
+                    </div>
+                    
+                    <!-- Withdraw Button -->
+                    <div class="withdraw-btn-modern" onclick="withdrawPcoins()">
+                        <div class="withdraw-btn-left">
+                            <div class="withdraw-icon"><i class="fas fa-wallet"></i></div>
+                            <div class="withdraw-text">
+                                <h4>WITHDRAW</h4>
+                                <p><i class="fab fa-whatsapp"></i> 1000 P Coin = ₹100</p>
+                            </div>
+                        </div>
+                        <div class="withdraw-arrow"><i class="fas fa-arrow-right"></i></div>
+                    </div>
+                    
+                    <!-- Transaction History -->
+                    <div class="transaction-history">
+                        <div class="section-title" style="margin-bottom: 15px;"><i class="fas fa-history"></i> Recent Transactions</div>
+                        ${transactionsHtml}
+                    </div>
+                </div>
+            </div>
+        `; 
+        
     } catch (error) { 
         hideLoader(); 
         console.error("Profile loading error:", error); 
         showToast('Error loading profile: ' + error.message); 
     } 
 }
+
+// ========================================
+// ইউজারের পোস্ট দেখার ফাংশন
+// ========================================
+
+async function viewUserPosts(username) {
+    showLoader("Loading posts...");
+    
+    try {
+        const videosSnapshot = await db.collection('videos').where('username', '==', username).orderBy('createdAt', 'desc').get();
+        const videos = [];
+        
+        videosSnapshot.forEach(doc => {
+            const data = doc.data();
+            videos.push({
+                id: doc.id,
+                url: data.video_url || data.url,
+                caption: data.caption || '',
+                thumbnail_time: data.thumbnail_time || 1
+            });
+        });
+        
+        hideLoader();
+        
+        let html = `
+            <div id="postsModal" class="modal-overlay" style="display: flex; z-index: 10000;">
+                <div class="bottom-modal" style="max-height: 80vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative;">
+                        <h3 style="margin: 0;"><i class="fas fa-video"></i> Posts (${videos.length})</h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeModal('postsModal')"></i>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;">
+                        <div class="posts-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">
+        `;
+        
+        if (videos.length === 0) {
+            html += `<div style="grid-column: span 3; text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-video-slash" style="font-size: 50px; margin-bottom: 10px;"></i>
+                        <p>No posts yet</p>
+                     </div>`;
+        } else {
+            videos.forEach(video => {
+                const thumbnailUrl = getThumbnailUrl(video.url, video.thumbnail_time || 1);
+                html += `
+                    <div class="posts-grid-item" onclick="playProfileVideo('${video.url}'); closeModal('postsModal')" style="aspect-ratio: 9/16; background: #000; border-radius: 8px; overflow: hidden; cursor: pointer;">
+                        <video src="${video.url}" poster="${thumbnailUrl}" muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('postsModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading posts:", error);
+        showToast("Failed to load posts");
+    }
+}
+
+// ========================================
+// ফলোয়ার লিস্ট দেখার ফাংশন
+// ========================================
+
+async function viewUserFollowers(username) {
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
+    
+    showLoader("Loading followers...");
+    
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (!userDoc.exists) {
+            hideLoader();
+            showToast("User not found");
+            return;
+        }
+        
+        const followers = userDoc.data().followers || [];
+        const followerDetails = [];
+        
+        for (const followerUsername of followers) {
+            const followerDoc = await db.collection('users').doc(followerUsername).get();
+            if (followerDoc.exists) {
+                followerDetails.push(followerDoc.data());
+            }
+        }
+        
+        hideLoader();
+        
+        let html = `
+            <div id="followersModal" class="modal-overlay" style="display: flex; z-index: 10000;">
+                <div class="bottom-modal" style="max-height: 80vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative;">
+                        <h3 style="margin: 0;"><i class="fas fa-users"></i> Followers (${followers.length})</h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeModal('followersModal')"></i>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;">
+        `;
+        
+        if (followerDetails.length === 0) {
+            html += `<div style="text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-user-slash" style="font-size: 50px; margin-bottom: 10px;"></i>
+                        <p>No followers yet</p>
+                     </div>`;
+        } else {
+            followerDetails.forEach(follower => {
+                const isFollowing = currentUser.following && currentUser.following.includes(follower.username);
+                const avatarColor = stringToColor(follower.username);
+                const letter = follower.username.replace('@', '').charAt(0).toUpperCase();
+                
+                html += `
+                    <div class="user-card" style="margin-bottom: 12px; cursor: pointer;" onclick="viewOtherProfile('${follower.username}'); closeModal('followersModal')">
+                        <div class="user-avatar-lg" style="background: ${avatarColor}; display: flex; align-items: center; justify-content: center;">
+                            ${follower.profilePic ? `<img src="${follower.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : letter}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${escapeHtml(follower.name || follower.username)}</div>
+                            <div class="user-username">${follower.username}</div>
+                        </div>
+                        <button class="follow-small-btn ${isFollowing ? 'following' : ''}" 
+                            onclick="event.stopPropagation(); handleFollow('${follower.username}', this)">
+                            ${isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('followersModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading followers:", error);
+        showToast("Failed to load followers");
+    }
+}
+
+// ========================================
+// ফলোইং লিস্ট দেখার ফাংশন
+// ========================================
+
+async function viewUserFollowing(username) {
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
+    
+    showLoader("Loading following...");
+    
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (!userDoc.exists) {
+            hideLoader();
+            showToast("User not found");
+            return;
+        }
+        
+        const following = userDoc.data().following || [];
+        const followingDetails = [];
+        
+        for (const followingUsername of following) {
+            const followingDoc = await db.collection('users').doc(followingUsername).get();
+            if (followingDoc.exists) {
+                followingDetails.push(followingDoc.data());
+            }
+        }
+        
+        hideLoader();
+        
+        let html = `
+            <div id="followingModal" class="modal-overlay" style="display: flex; z-index: 10000;">
+                <div class="bottom-modal" style="max-height: 80vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative;">
+                        <h3 style="margin: 0;"><i class="fas fa-user-friends"></i> Following (${following.length})</h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeModal('followingModal')"></i>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;">
+        `;
+        
+        if (followingDetails.length === 0) {
+            html += `<div style="text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-user-plus" style="font-size: 50px; margin-bottom: 10px;"></i>
+                        <p>Not following anyone yet</p>
+                   </div>`;
+        } else {
+            followingDetails.forEach(followingUser => {
+                const isFollowing = currentUser.following && currentUser.following.includes(followingUser.username);
+                const avatarColor = stringToColor(followingUser.username);
+                const letter = followingUser.username.replace('@', '').charAt(0).toUpperCase();
+                
+                html += `
+                    <div class="user-card" style="margin-bottom: 12px; cursor: pointer;" onclick="viewOtherProfile('${followingUser.username}'); closeModal('followingModal')">
+                        <div class="user-avatar-lg" style="background: ${avatarColor}; display: flex; align-items: center; justify-content: center;">
+                            ${followingUser.profilePic ? `<img src="${followingUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : letter}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${escapeHtml(followingUser.name || followingUser.username)}</div>
+                            <div class="user-username">${followingUser.username}</div>
+                        </div>
+                        <button class="follow-small-btn ${isFollowing ? 'following' : ''}" 
+                            onclick="event.stopPropagation(); handleFollow('${followingUser.username}', this)">
+                            ${isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('followingModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading following:", error);
+        showToast("Failed to load following");
+    }
+}
+
+// ========================================
+// মডাল বন্ধ করার ফাংশন
+// ========================================
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.remove();
+}
+
+// ========================================
+// checkAndResetDailyStars (আগের মতোই থাকবে)
+// ========================================
+
 function checkAndResetDailyStars(user) { 
     const today = new Date().toDateString(); 
     if (!user.dailyStars) { 
@@ -1047,6 +1444,11 @@ function checkAndResetDailyStars(user) {
     } 
     return user.dailyStars; 
 }
+
+// ========================================
+// renderDailyStarsUI (আগের মতোই থাকবে)
+// ========================================
+
 function renderDailyStarsUI(user) { 
     const dailyStars = checkAndResetDailyStars(user); 
     let html = ''; 
@@ -1055,75 +1457,6 @@ function renderDailyStarsUI(user) {
         html += `<div class="modern-star-btn ${claimed ? 'claimed' : 'available'}" onclick="claimDailyStar(${i}, this)"><i class="fas fa-star"></i><span>+1</span></div>`; 
     } 
     return html; 
-}
-function claimDailyStar(index, element) { 
-    const user = getActiveUser(); 
-    if (!user) return; 
-    const dailyStars = checkAndResetDailyStars(user); 
-    if (dailyStars.claimed[index]) { 
-        showToast('Already claimed today!'); 
-        return; 
-    } 
-    window.currentClaimIndex = index; 
-    window.currentClaimElement = element; 
-    if (typeof AndroidBridge !== "undefined") { 
-        AndroidBridge.showRewardAd(); 
-    } else { 
-        processStarClaimAfterAd(); 
-    } 
-}
-function processStarClaimAfterAd() { 
-    const index = window.currentClaimIndex; 
-    const element = window.currentClaimElement; 
-    const user = getActiveUser(); 
-    if (!user) return; 
-    const dailyStars = checkAndResetDailyStars(user); 
-    dailyStars.claimed[index] = true; 
-    user.starBalance = (user.starBalance || 0) + 1; 
-    user.pCoinBalance = (user.pCoinBalance || 0) + 1; 
-    if (!user.transactions) user.transactions = []; 
-    user.transactions.unshift({ type: 'received', amount: 1, title: 'Daily Star Claim', timestamp: Date.now(), time: new Date().toLocaleString() }); 
-    saveUser(user); 
-
-    // 🔥 ফায়ারবেসে ডাটা সেভ করার কোড (এটি যোগ করা হয়েছে)
-    db.collection('users').doc(user.username).update({
-        starBalance: user.starBalance,
-        pCoinBalance: user.pCoinBalance,
-        transactions: user.transactions,
-        dailyStars: user.dailyStars
-    }).catch(e => console.log("Firebase sync error:", e));
-
-    if (element) { 
-        element.classList.remove('available'); 
-        element.classList.add('claimed'); 
-        element.style.pointerEvents = 'none'; 
-    } 
-    addNotification(user.username, '🌟 Daily Star', 'Claimed 1 Free Star today!', 'fas fa-star', '#ffd700', 'star'); 
-    const balanceEl = document.getElementById('profilePcoinBalance'); 
-    if (balanceEl) balanceEl.innerText = user.pCoinBalance || 0; 
-    showToast("Congratulations! You earned 1 Star! 🌟"); 
-}
-
-async function withdrawPcoins() { 
-    const user = getActiveUser(); 
-    if (!user) return; 
-    if (user.pCoinBalance < 1000) { 
-        showToast('Need at least 1000 P Coins to withdraw'); 
-        return; 
-    } 
-    const coinsToDeduct = Math.floor(user.pCoinBalance / 1000) * 1000; 
-    const rupees = (coinsToDeduct / 1000) * 100; 
-    user.pCoinBalance -= coinsToDeduct; 
-    if (!user.transactions) user.transactions = []; 
-    user.transactions.unshift({ type: 'sent', amount: coinsToDeduct, title: 'Withdrawal Processed', timestamp: Date.now(), time: new Date().toLocaleString() }); 
-    saveUser(user); 
-    try { 
-        await db.collection('users').doc(user.username).update({ pCoinBalance: user.pCoinBalance, transactions: user.transactions }); 
-    } catch(e) { console.log("Firebase sync error:", e); } 
-    const message = `🔹 *Pikko Shorts Withdrawal Request* 🔹\n\n👤 *User:* ${user.name} (${user.username})\n💵 *Withdraw Amount:* ₹${rupees} (${coinsToDeduct} P Coins)\n💰 *Remaining Balance:* ${user.pCoinBalance}\n📅 *Date:* ${new Date().toLocaleDateString()}\n\nPlease process the withdrawal. Thank you!`; 
-    window.location.href = `https://wa.me/${WITHDRAW_WHATSAPP}?text=${encodeURIComponent(message)}`; 
-    showToast('Withdrawal successful! Coins deducted.'); 
-    renderProfile(); 
 }
 
 // ========================================
@@ -5818,4 +6151,3034 @@ console.log("✅ Black Screen Fix Loaded");
             console.warn("🛡️ Firebase settings override skipped.");
         }
     }
+})();
+
+// ========================================
+// 🎖️ UPDATED VIP MEMBERSHIP SYSTEM WITH ADMIN QUEUE
+// ========================================
+
+// VIP Configuration
+const VIP_CONFIG = {
+    plans: {
+        1: {
+            name: 'VIP 1',
+            price: 99,
+            stars: 1000,
+            pCoins: 250,
+            dailyStarReward: 9,
+            floatingStarReward: 100,
+            durationDays: 7,
+            exchangeLimit: 3,
+            color: '#9b59b6',
+            gradient: 'linear-gradient(135deg, #9b59b6, #8e44ad)'
+        },
+        2: {
+            name: 'VIP 2',
+            price: 199,
+            stars: 5000,
+            pCoins: 500,
+            dailyStarReward: 30,
+            floatingStarReward: 200,
+            durationDays: 7,
+            exchangeLimit: 3,
+            color: '#3498db',
+            gradient: 'linear-gradient(135deg, #3498db, #2980b9)'
+        },
+        3: {
+            name: 'VIP 3',
+            price: 399,
+            stars: 10000,
+            pCoins: 1000,
+            dailyStarReward: 30,
+            floatingStarReward: 200,
+            durationDays: 30,
+            exchangeLimit: 3,
+            color: '#e67e22',
+            gradient: 'linear-gradient(135deg, #e67e22, #d35400)'
+        },
+        4: {
+            name: 'VIP 4',
+            price: 499,
+            stars: 20000,
+            pCoins: 2000,
+            dailyStarReward: 30,
+            floatingStarReward: 200,
+            durationDays: 60,
+            exchangeLimit: 'unlimited',
+            color: '#e74c3c',
+            gradient: 'linear-gradient(135deg, #e74c3c, #c0392b)'
+        },
+        5: {
+            name: 'VIP 5',
+            price: 1599,
+            stars: 50000,
+            pCoins: 5000,
+            dailyStarReward: 30,
+            floatingStarReward: 200,
+            durationDays: 365,
+            exchangeLimit: 'unlimited',
+            color: '#f1c40f',
+            gradient: 'linear-gradient(135deg, #f1c40f, #f39c12)'
+        }
+    }
+};
+
+// VIP Request Queue (stored in localStorage)
+let vipRequestQueue = [];
+
+function loadVipRequestQueue() {
+    const saved = localStorage.getItem('vipRequestQueue');
+    if (saved) {
+        try {
+            vipRequestQueue = JSON.parse(saved);
+        } catch(e) {
+            vipRequestQueue = [];
+        }
+    }
+}
+
+function saveVipRequestQueue() {
+    localStorage.setItem('vipRequestQueue', JSON.stringify(vipRequestQueue));
+}
+
+// ========================================
+// 🎖️ COMPLETE VIP SYSTEM (BANGLISH)
+// ========================================
+
+// VIP প্যাকেজ কনফিগারেশন
+const VIP_PLANS = {
+    1: {
+        name: 'VIP 1',
+        price: 99,
+        stars: 1000,
+        pCoins: 250,
+        dailyStar: 9,
+        floatingStar: 100,
+        duration: 7,
+        color: '#9b59b6',
+        gradient: 'linear-gradient(135deg, #9b59b6, #8e44ad)'
+    },
+    2: {
+        name: 'VIP 2',
+        price: 199,
+        stars: 5000,
+        pCoins: 500,
+        dailyStar: 30,
+        floatingStar: 200,
+        duration: 7,
+        color: '#3498db',
+        gradient: 'linear-gradient(135deg, #3498db, #2980b9)'
+    },
+    3: {
+        name: 'VIP 3',
+        price: 399,
+        stars: 10000,
+        pCoins: 1000,
+        dailyStar: 30,
+        floatingStar: 200,
+        duration: 30,
+        color: '#e67e22',
+        gradient: 'linear-gradient(135deg, #e67e22, #d35400)'
+    },
+    4: {
+        name: 'VIP 4',
+        price: 499,
+        stars: 20000,
+        pCoins: 2000,
+        dailyStar: 30,
+        floatingStar: 200,
+        duration: 60,
+        color: '#e74c3c',
+        gradient: 'linear-gradient(135deg, #e74c3c, #c0392b)'
+    },
+    5: {
+        name: 'VIP 5',
+        price: 1599,
+        stars: 50000,
+        pCoins: 5000,
+        dailyStar: 30,
+        floatingStar: 200,
+        duration: 365,
+        color: '#f1c40f',
+        gradient: 'linear-gradient(135deg, #f1c40f, #f39c12)'
+    }
+};
+
+// ========================================
+// ভিআইপি মডাল খোলার ফাংশন
+// ========================================
+
+function openVipModal() {
+    const user = getActiveUser();
+    if (!user) {
+        showToast('দয়া করে লগইন করুন');
+        return;
+    }
+    
+    const modalHtml = `
+        <div id="vipModal" class="modal-overlay" style="z-index: 100000; display: flex;">
+            <div class="vip-modal-container-modern">
+                <div class="vip-modal-header-modern">
+                    <div class="vip-header-icon"><i class="fas fa-crown"></i></div>
+                    <h2>ভিআইপি মেম্বারশিপ</h2>
+                    <p>এক্সক্লুসিভ সুবিধা পেতে আজই ভিআইপি সদস্য হোন</p>
+                    <i class="fas fa-times vip-close-modern" onclick="closeVipModal()"></i>
+                </div>
+                
+                <div class="vip-user-status-modern">
+                    ${user.vip && user.vip.expiryDate > Date.now() ? `
+                        <div class="vip-active-card vip-${user.vip.level}">
+                            <i class="fas fa-crown"></i>
+                            <div class="vip-active-info">
+                                <span class="vip-active-name">${user.vip.planName} সক্রিয় আছে</span>
+                                <span class="vip-active-expiry">মেয়াদ শেষ: ${new Date(user.vip.expiryDate).toLocaleDateString('bn-BD')}</span>
+                            </div>
+                            <button class="vip-daily-claim-modern" onclick="claimVipDailyReward()"><i class="fas fa-gift"></i> দৈনিক স্টার নিন</button>
+                        </div>
+                    ` : `
+                        <div class="vip-inactive-card">
+                            <i class="fas fa-star"></i>
+                            <span>কোনো সক্রিয় ভিআইপি নেই</span>
+                            <small>নিচের প্যাকেজ থেকে বেছে নিন</small>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="vip-plans-grid-modern">
+                    ${generateVipPlansModern()}
+                </div>
+                
+                <div class="vip-payment-section-modern">
+                    <div class="vip-upi-info">
+                        <i class="fas fa-university"></i>
+                        <div>
+                            <strong>UPI আইডি:</strong>
+                            <span class="upi-id-copy" onclick="copyUpiId()">8391921082@ibl <i class="fas fa-copy"></i></span>
+                        </div>
+                    </div>
+                    <div class="vip-coupon-input">
+                        <input type="text" id="vipCouponCode" placeholder="কুপন কোড লিখুন" class="vip-coupon-field">
+                        <button class="vip-coupon-btn" onclick="applyVipCoupon()">এক্টিভেট করুন</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const existing = document.getElementById('vipModal');
+    if (existing) existing.remove();
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+}
+
+function generateVipPlansModern() {
+    let html = '';
+    
+    for (let [level, plan] of Object.entries(VIP_PLANS)) {
+        html += `
+            <div class="vip-plan-card-modern" data-level="${level}">
+                <div class="vip-plan-bg" style="background: ${plan.gradient}"></div>
+                <div class="vip-plan-badge">${plan.name}</div>
+                <div class="vip-plan-price">₹${plan.price}</div>
+                <div class="vip-plan-duration">${plan.duration} দিন</div>
+                <div class="vip-plan-features">
+                    <div class="vip-feature"><i class="fas fa-star"></i> <span>${plan.stars.toLocaleString()} স্টার</span> <small>তৎক্ষণাৎ</small></div>
+                    <div class="vip-feature"><i class="fas fa-coins"></i> <span>${plan.pCoins.toLocaleString()} পি কয়েন</span> <small>তৎক্ষণাৎ</small></div>
+                    <div class="vip-feature"><i class="fas fa-calendar-day"></i> <span>${plan.dailyStar} স্টার/দিন</span> <small>দৈনিক ক্লেইম</small></div>
+                    <div class="vip-feature"><i class="fas fa-cloud-sun"></i> <span>${plan.floatingStar} স্টার</span> <small>ভাসমান স্টার</small></div>
+                </div>
+                <button class="vip-buy-modern" onclick="sendVipPurchaseRequest(${level})">
+                    <i class="fas fa-shopping-cart"></i> কিনুন - ₹${plan.price}
+                </button>
+            </div>
+        `;
+    }
+    
+    return html;
+}
+
+function closeVipModal() {
+    const modal = document.getElementById('vipModal');
+    if (modal) modal.remove();
+}
+
+function copyUpiId() {
+    navigator.clipboard.writeText('8391921082@ibl');
+    showToast('✅ UPI আইডি কপি করা হয়েছে');
+}
+
+// ========================================
+// ভিআইপি ক্রয় রিকোয়েস্ট (হোয়াটসঅ্যাপে)
+// ========================================
+
+function sendVipPurchaseRequest(level) {
+    const plan = VIP_PLANS[level];
+    if (!plan) return;
+    
+    const user = getActiveUser();
+    if (!user) {
+        showToast('দয়া করে লগইন করুন');
+        return;
+    }
+    
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = now.toLocaleTimeString('bn-BD');
+    
+    const message = `*🎖️ ভিআইপি মেম্বারশিপ ক্রয় রিকোয়েস্ট* 🎖️
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *ব্যবহারকারী:* ${user.name || user.username}
+📱 *ইউজারনেম:* ${user.username}
+🎖️ *প্যাকেজ:* ${plan.name}
+💰 *মূল্য:* ₹${plan.price}
+⭐ *স্টার:* ${plan.stars.toLocaleString()}
+🪙 *পি কয়েন:* ${plan.pCoins.toLocaleString()}
+📅 *মেয়াদ:* ${plan.duration} দিন
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📆 *তারিখ:* ${dateStr}
+⏰ *সময়:* ${timeStr}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💳 *UPI আইডি:* 8391921082@ibl
+📝 *পেমেন্ট করার পর ট্রানজেকশন আইডি ও আপনার ইউজারনেম জানাবেন*
+
+পেমেন্ট কনফার্ম করলেই ভিআইপি এক্টিভেট করা হবে!`;
+    
+    window.location.href = `https://wa.me/918391921082?text=${encodeURIComponent(message)}`;
+    showToast('✅ হোয়াটসঅ্যাপে রিকোয়েস্ট পাঠানো হয়েছে');
+}
+
+// ========================================
+// কুপন কোড দ্বারা ভিআইপি এক্টিভেট (ইউজার সাইড)
+// ========================================
+
+async function applyVipCoupon() {
+    const couponInput = document.getElementById('vipCouponCode');
+    if (!couponInput) return;
+    
+    const couponCode = couponInput.value.trim().toUpperCase();
+    if (!couponCode) {
+        showToast('❌ দয়া করে কুপন কোড লিখুন');
+        return;
+    }
+    
+    showLoader('কুপন ভেরিফাই করা হচ্ছে...');
+    
+    try {
+        // ফায়ারবেস থেকে কুপন চেক করুন
+        const couponRef = db.collection('vip_coupons').doc(couponCode);
+        const doc = await couponRef.get();
+        
+        if (!doc.exists) {
+            hideLoader();
+            showToast('❌ ভুল কুপন কোড!');
+            return;
+        }
+        
+        const couponData = doc.data();
+        
+        if (couponData.used) {
+            hideLoader();
+            showToast('❌ এই কুপন ইতিমধ্যে ব্যবহার করা হয়েছে!');
+            return;
+        }
+        
+        if (couponData.expiryDate && couponData.expiryDate < Date.now()) {
+            hideLoader();
+            showToast('❌ কুপনের মেয়াদ শেষ হয়ে গেছে!');
+            return;
+        }
+        
+        const user = getActiveUser();
+        if (!user) {
+            hideLoader();
+            showToast('❌ দয়া করে লগইন করুন');
+            return;
+        }
+        
+        if (couponData.username !== user.username) {
+            hideLoader();
+            showToast('❌ এই কুপন আপনার জন্য নয়!');
+            return;
+        }
+        
+        // ভিআইপি এক্টিভেট করুন
+        const plan = VIP_PLANS[couponData.level];
+        if (!plan) {
+            hideLoader();
+            showToast('❌ ভুল কুপন ডাটা');
+            return;
+        }
+        
+        await activateVipForUser(user.username, couponData.level, couponData.transactionId || 'কুপন ব্যবহার');
+        
+        // কুপন ব্যবহার করা হয়েছে মার্ক করুন
+        await couponRef.update({
+            used: true,
+            usedAt: Date.now(),
+            usedBy: user.username
+        });
+        
+        hideLoader();
+        showToast(`✅ ${plan.name} সফলভাবে এক্টিভেট হয়েছে!`);
+        closeVipModal();
+        
+        // ইউজার ডাটা রিফ্রেশ করুন
+        setTimeout(() => {
+            if (typeof renderProfile === 'function') renderProfile();
+        }, 1500);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Coupon error:", error);
+        showToast('❌ কুপন ভেরিফাই করতে সমস্যা হয়েছে');
+    }
+}
+
+// ========================================
+// ভিআইপি এক্টিভেট করার ফাংশন
+// ========================================
+
+async function activateVipForUser(username, level, transactionId) {
+    const plan = VIP_PLANS[level];
+    if (!plan) return false;
+    
+    const userKey = 'user_' + username;
+    let userData = null;
+    
+    const localData = localStorage.getItem(userKey);
+    if (localData) {
+        userData = JSON.parse(localData);
+    }
+    
+    if (!userData) {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (userDoc.exists) userData = userDoc.data();
+    }
+    
+    if (!userData) return false;
+    
+    const expiryDate = Date.now() + (plan.duration * 24 * 60 * 60 * 1000);
+    
+    // ভিআইপি ডাটা আপডেট
+    if (userData.vip && userData.vip.expiryDate > Date.now()) {
+        userData.vip.expiryDate = userData.vip.expiryDate + (plan.duration * 24 * 60 * 60 * 1000);
+        userData.vip.level = Math.max(userData.vip.level, level);
+        userData.vip.planName = `VIP ${userData.vip.level}`;
+    } else {
+        userData.vip = {
+            level: level,
+            planName: plan.name,
+            expiryDate: expiryDate,
+            activatedAt: Date.now(),
+            dailyClaimed: [],
+            transactionId: transactionId
+        };
+    }
+    
+    // রিওয়ার্ড যোগ করুন
+    userData.starBalance = (userData.starBalance || 0) + plan.stars;
+    userData.pCoinBalance = (userData.pCoinBalance || 0) + plan.pCoins;
+    
+    // ট্রানজেকশন যোগ করুন
+    if (!userData.transactions) userData.transactions = [];
+    userData.transactions.unshift({
+        type: 'received',
+        amount: plan.stars,
+        title: `🎖️ ${plan.name} ভিআইপি এক্টিভেশন - ${plan.stars} স্টার + ${plan.pCoins} পি কয়েন`,
+        timestamp: Date.now(),
+        time: new Date().toLocaleString(),
+        vipLevel: level,
+        transactionId: transactionId
+    });
+    
+    // সেভ করুন
+    localStorage.setItem(userKey, JSON.stringify(userData));
+    
+    // ফায়ারবেসে সেভ করুন
+    try {
+        await db.collection('users').doc(username).set({
+            starBalance: userData.starBalance,
+            pCoinBalance: userData.pCoinBalance,
+            vip: userData.vip,
+            transactions: userData.transactions
+        }, { merge: true });
+    } catch(e) {
+        console.error("Firebase sync error:", e);
+    }
+    
+    // বর্তমান ইউজার আপডেট করুন
+    const currentUser = getActiveUser();
+    if (currentUser && currentUser.username === username) {
+        currentUser.starBalance = userData.starBalance;
+        currentUser.pCoinBalance = userData.pCoinBalance;
+        currentUser.vip = userData.vip;
+        saveUser(currentUser);
+    }
+    
+    // নোটিফিকেশন পাঠান
+    addNotification(username, '🎖️ ভিআইপি এক্টিভেটেড!', `${plan.name} সফলভাবে এক্টিভেট হয়েছে! ${plan.stars.toLocaleString()} স্টার ও ${plan.pCoins.toLocaleString()} পি কয়েন যোগ হয়েছে!`, 'fas fa-crown', '#f1c40f', 'general');
+    
+    return true;
+}
+
+// ========================================
+// দৈনিক ভিআইপি স্টার ক্লেইম
+// ========================================
+
+function claimVipDailyReward() {
+    const user = getActiveUser();
+    if (!user) {
+        showToast('দয়া করে লগইন করুন');
+        return;
+    }
+    
+    if (!user.vip || user.vip.expiryDate < Date.now()) {
+        showToast('❌ আপনার কোন সক্রিয় ভিআইপি নেই!');
+        return;
+    }
+    
+    const plan = VIP_PLANS[user.vip.level];
+    if (!plan) return;
+    
+    const today = new Date().toDateString();
+    const dailyClaimed = user.vip.dailyClaimed || [];
+    
+    if (dailyClaimed.includes(today)) {
+        showToast('আপনি আজকের দৈনিক স্টার ইতিমধ্যে নিয়ে নিয়েছেন!');
+        return;
+    }
+    
+    // স্টার যোগ করুন
+    user.starBalance = (user.starBalance || 0) + plan.dailyStar;
+    user.pCoinBalance = (user.pCoinBalance || 0) + plan.dailyStar;
+    
+    // ক্লেইম মার্ক করুন
+    dailyClaimed.push(today);
+    user.vip.dailyClaimed = dailyClaimed;
+    
+    // ট্রানজেকশন যোগ করুন
+    if (!user.transactions) user.transactions = [];
+    user.transactions.unshift({
+        type: 'received',
+        amount: plan.dailyStar,
+        title: `🎖️ ভিআইপি দৈনিক রিওয়ার্ড (${plan.name})`,
+        timestamp: Date.now(),
+        time: new Date().toLocaleString()
+    });
+    
+    saveUser(user);
+    
+    // ফায়ারবেসে সেভ করুন
+    db.collection('users').doc(user.username).update({
+        starBalance: user.starBalance,
+        pCoinBalance: user.pCoinBalance,
+        vip: user.vip,
+        transactions: user.transactions
+    }).catch(e => console.log("Firebase sync error:", e));
+    
+    showToast(`🎖️ ভিআইপি দৈনিক রিওয়ার্ড: +${plan.dailyStar} স্টার ও পি কয়েন!`);
+    
+    // UI আপডেট করুন
+    updateWalletUI(user);
+    
+    // মডাল বন্ধ করুন
+    closeVipModal();
+}
+
+// ========================================
+// প্রোফাইলে ভিআইপি বাটন যোগ করুন (বড় ও প্রফেশনাল)
+// ========================================
+
+function addVipButtonToProfileModern() {
+    setTimeout(() => {
+        const profileHeader = document.querySelector('.profile-header');
+        if (profileHeader && !document.getElementById('profileVipBtnModern')) {
+            const user = getActiveUser();
+            const isVipActive = user && user.vip && user.vip.expiryDate > Date.now();
+            
+            const vipBtnHtml = `
+                <button id="profileVipBtnModern" onclick="openVipModal()" 
+                    class="vip-profile-btn-modern ${isVipActive ? 'vip-active-btn' : ''}"
+                    style="background: ${isVipActive ? 'linear-gradient(135deg, #f1c40f, #e67e22)' : 'linear-gradient(135deg, #333, #222)'}; 
+                    width: 90%;
+                    max-width: 280px;
+                    margin: 15px auto 0;
+                    padding: 14px 20px;
+                    border: ${isVipActive ? '2px solid #ffd700' : '1px solid #444'};
+                    border-radius: 50px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    cursor: pointer;
+                    transition: all 0.3s ease;
+                    color: ${isVipActive ? '#000' : '#fff'};
+                    box-shadow: ${isVipActive ? '0 8px 20px rgba(241,196,15,0.4)' : 'none'};
+                    position: relative;
+                    overflow: hidden;">
+                    <i class="fas fa-crown" style="font-size: 20px; color: ${isVipActive ? '#ffd700' : '#f1c40f'}"></i>
+                    <span>${isVipActive ? `🎖️ ${user.vip.planName} সক্রিয়` : '✨ ভিআইপি সদস্য হোন ✨'}</span>
+                    <i class="fas fa-chevron-right" style="font-size: 14px;"></i>
+                </button>
+            `;
+            
+            const editBtn = profileHeader.querySelector('.primary-btn');
+            if (editBtn) {
+                editBtn.insertAdjacentHTML('afterend', vipBtnHtml);
+            } else {
+                const statsRow = profileHeader.querySelector('.stats-row');
+                if (statsRow) {
+                    statsRow.insertAdjacentHTML('afterend', vipBtnHtml);
+                }
+            }
+        }
+    }, 600);
+}
+
+// ========================================
+// অ্যাডমিন প্যানেলে ভিআইপি কুপন জেনারেটর
+// ========================================
+
+function addVipAdminCouponGenerator() {
+    setTimeout(() => {
+        const adminSection = document.querySelector('.admin-testing-section');
+        if (!adminSection) return;
+        
+        if (document.getElementById('vipAdminGenerator')) return;
+        
+        const generatorHtml = `
+            <div id="vipAdminGenerator" style="margin-top: 25px; border-top: 2px solid #f1c40f; padding-top: 20px;">
+                <h4 style="margin-bottom: 15px; color: #f1c40f; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-crown"></i> 🎖️ ভিআইপি কুপন জেনারেটর
+                </h4>
+                
+                <div style="background: var(--input-bg); border-radius: 15px; padding: 15px; margin-bottom: 15px;">
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px;">সিলেক্ট ইউজার:</label>
+                        <select id="vipUserSelect" class="vip-admin-select" style="width: 100%; padding: 10px; border-radius: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border);">
+                            <option value="">-- ইউজার সিলেক্ট করুন --</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px;">ভিআইপি প্যাকেজ:</label>
+                        <select id="vipPackageSelect" class="vip-admin-select" style="width: 100%; padding: 10px; border-radius: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border);">
+                            <option value="1">VIP 1 - ₹99 (1000 স্টার + 250 পি কয়েন)</option>
+                            <option value="2">VIP 2 - ₹199 (5000 স্টার + 500 পি কয়েন)</option>
+                            <option value="3">VIP 3 - ₹399 (10000 স্টার + 1000 পি কয়েন)</option>
+                            <option value="4">VIP 4 - ₹499 (20000 স্টার + 2000 পি কয়েন)</option>
+                            <option value="5">VIP 5 - ₹1599 (50000 স্টার + 5000 পি কয়েন)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="margin-bottom: 12px;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 13px;">ট্রানজেকশন আইডি (অপশনাল):</label>
+                        <input type="text" id="vipTxnId" class="vip-admin-input" placeholder="TX123456" style="width: 100%; padding: 10px; border-radius: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border);">
+                    </div>
+                    
+                    <button onclick="generateVipCouponAndSend()" 
+                        style="width: 100%; background: linear-gradient(135deg, #f1c40f, #e67e22); 
+                        color: #000; border: none; padding: 14px; border-radius: 12px; 
+                        font-weight: bold; font-size: 16px; cursor: pointer; 
+                        display: flex; align-items: center; justify-content: center; gap: 10px;
+                        margin-top: 10px;">
+                        <i class="fas fa-ticket-alt"></i> কুপন জেনারেট করুন ও পাঠান
+                    </button>
+                </div>
+                
+                <div id="vipCouponResult" style="display: none; background: rgba(46,204,113,0.1); border-radius: 12px; padding: 12px; margin-top: 10px; border: 1px solid #2ecc71;">
+                    <p style="color: #2ecc71; margin: 0;"><i class="fas fa-check-circle"></i> <span id="vipCouponResultText"></span></p>
+                </div>
+            </div>
+        `;
+        
+        adminSection.insertAdjacentHTML('beforeend', generatorHtml);
+        
+        // ইউজার লিস্ট পপুলেট করুন
+        populateVipUserSelect();
+    }, 1000);
+}
+
+async function populateVipUserSelect() {
+    const select = document.getElementById('vipUserSelect');
+    if (!select) return;
+    
+    const users = await getAllUsersFromBoth();
+    
+    select.innerHTML = '<option value="">-- ইউজার সিলেক্ট করুন --</option>';
+    users.forEach(user => {
+        if (user && user.username) {
+            select.innerHTML += `<option value="${user.username}">${user.name || user.username} (${user.username})</option>`;
+        }
+    });
+}
+
+// ========================================
+// কুপন জেনারেট ও ইউজারের ইনবক্সে পাঠান
+// ========================================
+
+async function generateVipCouponAndSend() {
+    const userSelect = document.getElementById('vipUserSelect');
+    const packageSelect = document.getElementById('vipPackageSelect');
+    const txnInput = document.getElementById('vipTxnId');
+    
+    const username = userSelect?.value;
+    const level = packageSelect?.value;
+    const transactionId = txnInput?.value.trim() || 'অ্যাডমিন জেনারেটেড';
+    
+    if (!username) {
+        showAdminMessage('❌ দয়া করে একটি ইউজার সিলেক্ট করুন');
+        return;
+    }
+    
+    if (!level) {
+        showAdminMessage('❌ দয়া করে একটি প্যাকেজ সিলেক্ট করুন');
+        return;
+    }
+    
+    const plan = VIP_PLANS[level];
+    if (!plan) return;
+    
+    showLoader('কুপন জেনারেট করা হচ্ছে...');
+    
+    try {
+        // ইউনিক কুপন কোড জেনারেট করুন
+        const couponCode = 'VIP' + Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // ফায়ারবেসে কুপন সেভ করুন
+        await db.collection('vip_coupons').doc(couponCode).set({
+            code: couponCode,
+            username: username,
+            level: parseInt(level),
+            planName: plan.name,
+            price: plan.price,
+            stars: plan.stars,
+            pCoins: plan.pCoins,
+            duration: plan.duration,
+            transactionId: transactionId,
+            used: false,
+            createdAt: Date.now(),
+            expiryDate: Date.now() + (7 * 24 * 60 * 60 * 1000), // 7 দিন মেয়াদ
+            createdBy: getActiveUser()?.username || 'admin'
+        });
+        
+        // ইউজারের ইনবক্সে মেসেজ পাঠান
+        const chatId = getChatId('@pikko_official', username);
+        
+        // পিকো অফিসিয়াল একাউন্ট চেক করুন
+        const pikkoRef = db.collection('users').doc('@pikko_official');
+        const pikkoDoc = await pikkoRef.get();
+        if (!pikkoDoc.exists) {
+            await pikkoRef.set({
+                name: 'Pikko AI',
+                username: '@pikko_official',
+                bio: 'Official Pikko Shorts Assistant',
+                profilePic: '',
+                verification: 'blue',
+                isOfficial: true,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+        
+        // চ্যাটে মেসেজ যোগ করুন
+        await db.collection('chats').doc(chatId).set({
+            participants: ['@pikko_official', username],
+            lastMessage: `🎖️ আপনার ভিআইপি কুপন কোড: ${couponCode}`,
+            lastMessageTime: Date.now(),
+            lastSender: '@pikko_official',
+            unreadCount: { [username]: 1 }
+        }, { merge: true });
+        
+        const messageText = `🎖️ *ভিআইপি মেম্বারশিপ কুপন* 🎖️
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+👤 *ইউজার:* ${username}
+🎖️ *প্যাকেজ:* ${plan.name}
+💰 *মূল্য:* ₹${plan.price}
+⭐ *স্টার:* ${plan.stars.toLocaleString()}
+🪙 *পি কয়েন:* ${plan.pCoins.toLocaleString()}
+📅 *মেয়াদ:* ${plan.duration} দিন
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔑 *আপনার কুপন কোড:* \`${couponCode}\`
+
+📝 *কিভাবে ব্যবহার করবেন:*
+১. প্রোফাইল পেজে যান
+২. ভিআইপি বাটনে ক্লিক করুন
+৩. কুপন কোড লিখে "এক্টিভেট করুন" বাটনে ক্লিক করুন
+
+⚠️ *কুপনটির মেয়াদ ৭ দিন*
+🎉 শুভকামনা!`;
+        
+        await db.collection('chats').doc(chatId).collection('messages').add({
+            sender: '@pikko_official',
+            receiver: username,
+            text: messageText,
+            timestamp: Date.now(),
+            type: 'vip_coupon',
+            couponCode: couponCode,
+            isOfficial: true
+        });
+        
+        // নোটিফিকেশন পাঠান
+        addNotification(username, '🎖️ ভিআইপি কুপন প্রাপ্ত!', `আপনার ${plan.name} প্যাকেজের কুপন কোড: ${couponCode}`, 'fas fa-ticket-alt', '#f1c40f', 'coupon');
+        
+        hideLoader();
+        
+        // রেজাল্ট দেখান
+        const resultDiv = document.getElementById('vipCouponResult');
+        const resultText = document.getElementById('vipCouponResultText');
+        if (resultDiv && resultText) {
+            resultText.innerHTML = `কুপন "${couponCode}" ${username} এর ইনবক্সে পাঠানো হয়েছে!`;
+            resultDiv.style.display = 'block';
+            setTimeout(() => {
+                resultDiv.style.display = 'none';
+            }, 5000);
+        }
+        
+        showAdminMessage(`✅ কুপন "${couponCode}" ${username} এর ইনবক্সে পাঠানো হয়েছে!`);
+        
+        // ইনপুট ফিল্ড ক্লিয়ার করুন
+        if (txnInput) txnInput.value = '';
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Coupon generation error:", error);
+        showAdminMessage('❌ কুপন জেনারেট করতে সমস্যা হয়েছে: ' + error.message);
+    }
+}
+
+// ========================================
+// রেন্ডার প্রোফাইল ওভাররাইড করুন
+// ========================================
+
+const originalRenderProfileVip = window.renderProfile;
+if (originalRenderProfileVip) {
+    window.renderProfile = async function() {
+        await originalRenderProfileVip();
+        addVipButtonToProfileModern();
+    };
+}
+
+// ========================================
+// অ্যাডমিন প্যানেল ওভাররাইড করুন
+// ========================================
+
+const originalOpenAdminPanelVip = window.openAdminPanel;
+if (originalOpenAdminPanelVip) {
+    window.openAdminPanel = function() {
+        originalOpenAdminPanelVip();
+        setTimeout(() => {
+            addVipAdminCouponGenerator();
+        }, 800);
+    };
+}
+
+// ========================================
+// ফ্লোটিং স্টার ওভাররাইড (ভিআইপি বুস্ট)
+// ========================================
+
+const originalGiveFloatingStarVip = window.giveFloatingStarReward;
+if (originalGiveFloatingStarVip) {
+    window.giveFloatingStarReward = function() {
+        const user = getActiveUser();
+        let rewardAmount = 2;
+        
+        if (user && user.vip && user.vip.expiryDate > Date.now()) {
+            const plan = VIP_PLANS[user.vip.level];
+            if (plan) {
+                rewardAmount = plan.floatingStar;
+            }
+        }
+        
+        const MAX_DAILY = (user && user.vip && user.vip.expiryDate > Date.now()) ? 500 : 50;
+        
+        if (!user.floatingStarData) {
+            user.floatingStarData = { date: new Date().toDateString(), earned: 0 };
+        }
+        
+        if (user.floatingStarData.earned >= MAX_DAILY) {
+            return;
+        }
+        
+        user.starBalance = (user.starBalance || 0) + rewardAmount;
+        user.pCoinBalance = (user.pCoinBalance || 0) + rewardAmount;
+        user.floatingStarData.earned += rewardAmount;
+        
+        if (!user.transactions) user.transactions = [];
+        user.transactions.unshift({
+            type: 'received',
+            amount: rewardAmount,
+            title: user.vip ? `🎖️ ভিআইপি ভাসমান স্টার (${user.vip.planName})` : '🌟 ভাসমান স্টার রিওয়ার্ড',
+            timestamp: Date.now(),
+            time: new Date().toLocaleString()
+        });
+        
+        saveUser(user);
+        
+        db.collection('users').doc(user.username).set({
+            starBalance: user.starBalance,
+            pCoinBalance: user.pCoinBalance,
+            floatingStarData: user.floatingStarData,
+            transactions: user.transactions
+        }, { merge: true }).catch(e => console.log("Firebase sync error:", e));
+        
+        updateWalletUI(user);
+        showStarPopAnimation();
+        
+        const starText = document.getElementById('floatingStarText');
+        if (starText) {
+            starText.innerText = `${user.floatingStarData.earned}/${MAX_DAILY}`;
+        }
+        
+        showToast(`🎖️ ভিআইপি +${rewardAmount} স্টার ও পি কয়েন!`, 1500);
+    };
+}
+
+// ========================================
+// দৈনিক স্টার ওভাররাইড (ভিআইপি বুস্ট)
+// ========================================
+
+const originalClaimDailyStarVip = window.claimDailyStar;
+if (originalClaimDailyStarVip) {
+    window.claimDailyStar = function(index, element) {
+        const user = getActiveUser();
+        
+        if (user && user.vip && user.vip.expiryDate > Date.now()) {
+            const plan = VIP_PLANS[user.vip.level];
+            if (plan && plan.dailyStar > 1) {
+                window.currentClaimIndex = index;
+                window.currentClaimElement = element;
+                
+                if (typeof AndroidBridge !== "undefined") {
+                    AndroidBridge.showRewardAd();
+                } else {
+                    processVipDailyStarClaim();
+                }
+                return;
+            }
+        }
+        
+        originalClaimDailyStarVip(index, element);
+    };
+}
+
+function processVipDailyStarClaim() {
+    const index = window.currentClaimIndex;
+    const element = window.currentClaimElement;
+    const user = getActiveUser();
+    
+    if (!user) return;
+    
+    const dailyStars = checkAndResetDailyStars(user);
+    
+    if (dailyStars.claimed[index]) {
+        showToast('আপনি আজকের স্টার ইতিমধ্যে নিয়ে নিয়েছেন!');
+        return;
+    }
+    
+    let rewardAmount = 1;
+    
+    if (user.vip && user.vip.expiryDate > Date.now()) {
+        const plan = VIP_PLANS[user.vip.level];
+        if (plan) {
+            rewardAmount = plan.dailyStar;
+        }
+    }
+    
+    dailyStars.claimed[index] = true;
+    user.starBalance = (user.starBalance || 0) + rewardAmount;
+    user.pCoinBalance = (user.pCoinBalance || 0) + rewardAmount;
+    
+    if (!user.transactions) user.transactions = [];
+    user.transactions.unshift({
+        type: 'received',
+        amount: rewardAmount,
+        title: user.vip ? `🎖️ ভিআইপি দৈনিক স্টার (${user.vip.planName})` : 'দৈনিক স্টার',
+        timestamp: Date.now(),
+        time: new Date().toLocaleString()
+    });
+    
+    saveUser(user);
+    
+    db.collection('users').doc(user.username).update({
+        starBalance: user.starBalance,
+        pCoinBalance: user.pCoinBalance,
+        transactions: user.transactions,
+        dailyStars: user.dailyStars
+    }).catch(e => console.log("Firebase sync error:", e));
+    
+    if (element) {
+        element.classList.remove('available');
+        element.classList.add('claimed');
+        element.style.pointerEvents = 'none';
+    }
+    
+    addNotification(user.username, `🎖️ ভিআইপি দৈনিক রিওয়ার্ড`, `আপনি ${rewardAmount} ভিআইপি স্টার পেয়েছেন!`, 'fas fa-crown', '#f1c40f', 'star');
+    
+    const balanceEl = document.getElementById('profilePcoinBalance');
+    if (balanceEl) balanceEl.innerText = user.pCoinBalance || 0;
+    
+    showToast(`🎖️ ভিআইপি রিওয়ার্ড: ${rewardAmount} স্টার ও পি কয়েন!`);
+}
+
+// ========================================
+// ভিআইপি মেয়াদ শেষ চেকার
+// ========================================
+
+function checkExpiredVip() {
+    const user = getActiveUser();
+    if (user && user.vip && user.vip.expiryDate < Date.now()) {
+        delete user.vip;
+        saveUser(user);
+        
+        db.collection('users').doc(user.username).update({
+            vip: null
+        }).catch(e => console.log("Firebase sync error:", e));
+        
+        showToast('⚠️ আপনার ভিআইপি মেম্বারশিপের মেয়াদ শেষ হয়ে গেছে!');
+    }
+}
+
+// প্রতি ঘন্টায় চেক করুন
+setInterval(checkExpiredVip, 60 * 60 * 1000);
+
+// গ্লোবাল ফাংশন
+window.openVipModal = openVipModal;
+window.closeVipModal = closeVipModal;
+window.sendVipPurchaseRequest = sendVipPurchaseRequest;
+window.applyVipCoupon = applyVipCoupon;
+window.claimVipDailyReward = claimVipDailyReward;
+window.generateVipCouponAndSend = generateVipCouponAndSend;
+window.copyUpiId = copyUpiId;
+
+console.log("✅ ভিআইপি সিস্টেম সফলভাবে লোড হয়েছে!");
+
+// ========================================
+// 🔥 COMPLETE REAL-TIME FOLLOW/FOLLOWERS SYSTEM
+// ========================================
+
+// ========================================
+// 1. ফায়ারবেস রিয়েল-টাইম লিসেনার সেটআপ
+// ========================================
+
+let realtimeFollowListener = null;
+let currentProfileUsername = null;
+
+function startRealtimeFollowListener(username) {
+    // পুরানো লিসেনার বন্ধ করুন
+    if (realtimeFollowListener) {
+        realtimeFollowListener();
+        realtimeFollowListener = null;
+    }
+    
+    if (!username) return;
+    currentProfileUsername = username;
+    
+    // ফায়ারবেস থেকে রিয়েল-টাইমে ফলোয়ার এবং ফলোইং লিসেন করুন
+    realtimeFollowListener = db.collection('users').doc(username).onSnapshot((doc) => {
+        if (doc.exists) {
+            const userData = doc.data();
+            const currentUser = getActiveUser();
+            
+            // লোকাল স্টোরেজ আপডেট করুন
+            const userKey = 'user_' + username;
+            let localUser = localStorage.getItem(userKey);
+            if (localUser) {
+                localUser = JSON.parse(localUser);
+                localUser.followers = userData.followers || [];
+                localUser.following = userData.following || [];
+                localStorage.setItem(userKey, JSON.stringify(localUser));
+            }
+            
+            // যদি এটি বর্তমান ইউজার হয়, তাহলে অ্যাক্টিভ ইউজারও আপডেট করুন
+            if (currentUser && currentUser.username === username) {
+                currentUser.followers = userData.followers || [];
+                currentUser.following = userData.following || [];
+                saveUser(currentUser);
+            }
+            
+            // UI আপডেট করুন (যদি প্রোফাইল পেজ খোলা থাকে)
+            updateFollowUIRealtime(username, userData.followers || [], userData.following || []);
+        }
+    }, (error) => {
+        console.error("Follow listener error:", error);
+    });
+}
+
+// ========================================
+// 2. UI রিয়েল-টাইম আপডেট ফাংশন
+// ========================================
+
+function updateFollowUIRealtime(username, followers, following) {
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
+    
+    const isFollowing = followers ? followers.includes(currentUser.username) : false;
+    
+    // প্রোফাইল পেজে ফলো বাটন আপডেট করুন
+    const followBtn = document.querySelector(`.follow-btn[onclick*="handleFollow('${username}', this)"]`);
+    if (followBtn) {
+        if (isFollowing) {
+            followBtn.innerText = "Following";
+            followBtn.classList.add('following');
+        } else {
+            followBtn.innerText = "Follow";
+            followBtn.classList.remove('following');
+        }
+    }
+    
+    // এক্সপ্লোর পেজে ফলো বাটন আপডেট করুন
+    const exploreFollowBtns = document.querySelectorAll(`.follow-small-btn[onclick*="handleFollow('${username}', this)"]`);
+    exploreFollowBtns.forEach(btn => {
+        if (isFollowing) {
+            btn.innerText = "Following";
+            btn.classList.add('following');
+        } else {
+            btn.innerText = "Follow";
+            btn.classList.remove('following');
+        }
+    });
+    
+    // প্রোফাইলের স্ট্যাটাস আপডেট করুন (ফলোয়ার কাউন্ট)
+    const statsRow = document.querySelector('.stats-row');
+    if (statsRow && window.location.href.includes('viewOtherProfile')) {
+        // ফলোয়ার কাউন্ট আপডেট করার প্রয়োজন হলে এখানে করুন
+    }
+}
+
+// ========================================
+// 3. আপডেটেড ফলো ফাংশন (Firebase + LocalStorage Sync)
+// ========================================
+
+const originalHandleFollow = window.handleFollow;
+window.handleFollow = async function(targetUsername, btn) {
+    const currentUser = getActiveUser();
+    if (!currentUser) {
+        showToast('Please login first');
+        return;
+    }
+    
+    if (!targetUsername) return;
+    if (currentUser.username === targetUsername) {
+        showToast("Cannot follow yourself");
+        return;
+    }
+    
+    // বাটন ডিজেবল করুন (ডাবল ক্লিক প্রতিরোধ)
+    if (btn) btn.disabled = true;
+    
+    showLoaderText("Updating...");
+    
+    try {
+        // ফায়ারবেস থেকে বর্তমান ডাটা পড়ুন
+        const targetUserRef = db.collection('users').doc(targetUsername);
+        const targetDoc = await targetUserRef.get();
+        
+        if (!targetDoc.exists) {
+            showToast("User not found");
+            if (btn) btn.disabled = false;
+            return;
+        }
+        
+        let targetFollowers = targetDoc.data().followers || [];
+        const isCurrentlyFollowing = targetFollowers.includes(currentUser.username);
+        
+        // ট্রানজেকশন ব্যবহার করুন (এটমিক অপারেশনের জন্য)
+        if (isCurrentlyFollowing) {
+            // আনফলো করুন
+            targetFollowers = targetFollowers.filter(f => f !== currentUser.username);
+            await targetUserRef.update({ followers: targetFollowers });
+            
+            // বর্তমান ইউজারের ফলোইং লিস্ট আপডেট করুন
+            const currentUserRef = db.collection('users').doc(currentUser.username);
+            const currentDoc = await currentUserRef.get();
+            let currentFollowing = currentDoc.data().following || [];
+            currentFollowing = currentFollowing.filter(f => f !== targetUsername);
+            await currentUserRef.update({ following: currentFollowing });
+            
+            // UI আপডেট
+            if (btn) {
+                btn.innerText = "Follow";
+                btn.classList.remove('following');
+            }
+            showToast(`Unfollowed ${targetUsername}`);
+            
+        } else {
+            // ফলো করুন
+            targetFollowers.push(currentUser.username);
+            await targetUserRef.update({ followers: targetFollowers });
+            
+            // বর্তমান ইউজারের ফলোইং লিস্ট আপডেট করুন
+            const currentUserRef = db.collection('users').doc(currentUser.username);
+            const currentDoc = await currentUserRef.get();
+            let currentFollowing = currentDoc.data().following || [];
+            if (!currentFollowing.includes(targetUsername)) {
+                currentFollowing.push(targetUsername);
+                await currentUserRef.update({ following: currentFollowing });
+            }
+            
+            // UI আপডেট
+            if (btn) {
+                btn.innerText = "Following";
+                btn.classList.add('following');
+            }
+            showToast(`You are now following ${targetUsername}`);
+            
+            // নোটিফিকেশন পাঠান
+            addNotification(targetUsername, '👥 New Follower', `${currentUser.username} started following you`, 'fas fa-user-plus', '#00e5ff', 'follow');
+        }
+        
+        // লোকাল স্টোরেজ সিঙ্ক করুন
+        await syncFollowDataToLocalStorage(currentUser.username);
+        await syncFollowDataToLocalStorage(targetUsername);
+        
+        // বর্তমান ইউজারের ডাটা আপডেট করুন
+        const updatedCurrentUser = getActiveUser();
+        if (updatedCurrentUser) {
+            if (isCurrentlyFollowing) {
+                updatedCurrentUser.following = (updatedCurrentUser.following || []).filter(f => f !== targetUsername);
+            } else {
+                if (!updatedCurrentUser.following) updatedCurrentUser.following = [];
+                if (!updatedCurrentUser.following.includes(targetUsername)) {
+                    updatedCurrentUser.following.push(targetUsername);
+                }
+            }
+            saveUser(updatedCurrentUser);
+        }
+        
+        // প্রোফাইল রিফ্রেশ করুন (যদি প্রোফাইল পেজে থাকে)
+        if (contentDiv.innerHTML.includes(targetUsername) || contentDiv.innerHTML.includes('profile-header')) {
+            setTimeout(() => {
+                if (currentUser.username === targetUsername) {
+                    renderProfile();
+                } else {
+                    viewOtherProfile(targetUsername);
+                }
+            }, 500);
+        }
+        
+    } catch(error) {
+        console.error("Follow error:", error);
+        showToast("Network error! Please try again.");
+    } finally {
+        if (btn) btn.disabled = false;
+        hideLoader();
+    }
+};
+
+// ========================================
+// 4. লোকাল স্টোরেজে ফলো ডাটা সিঙ্ক করুন
+// ========================================
+
+async function syncFollowDataToLocalStorage(username) {
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const localKey = 'user_' + username;
+            let localUser = localStorage.getItem(localKey);
+            
+            if (localUser) {
+                localUser = JSON.parse(localUser);
+                localUser.followers = userData.followers || [];
+                localUser.following = userData.following || [];
+                localStorage.setItem(localKey, JSON.stringify(localUser));
+            }
+            
+            // বর্তমান ইউজার আপডেট করুন
+            const activeUser = getActiveUser();
+            if (activeUser && activeUser.username === username) {
+                activeUser.followers = userData.followers || [];
+                activeUser.following = userData.following || [];
+                saveUser(activeUser);
+            }
+        }
+    } catch(e) {
+        console.error("Sync error:", e);
+    }
+}
+
+// ========================================
+// 5. প্রোফাইল ভিউতে রিয়েল-টাইম লিসেনার শুরু করুন
+// ========================================
+
+const originalViewOtherProfile = window.viewOtherProfile;
+if (originalViewOtherProfile) {
+    window.viewOtherProfile = async function(username) {
+        // প্রোফাইল ভিউ করার আগে রিয়েল-টাইম লিসেনার শুরু করুন
+        startRealtimeFollowListener(username);
+        await originalViewOtherProfile(username);
+    };
+}
+
+// নিজের প্রোফাইলের জন্য
+const originalRenderProfile = window.renderProfile;
+if (originalRenderProfile) {
+    window.renderProfile = async function() {
+        const user = getActiveUser();
+        if (user) {
+            startRealtimeFollowListener(user.username);
+        }
+        await originalRenderProfile();
+    };
+}
+
+// ========================================
+// 6. ফায়ারবেস থেকে সব ফলো ডাটা রিসেট করুন (অ্যাডমিন টুল)
+// ========================================
+
+async function resetAllFollowData() {
+    if (!confirm("⚠️ Are you sure? This will reset ALL follow/follower data in Firebase!\n\nThis action cannot be undone!")) {
+        return;
+    }
+    
+    showLoader("Resetting follow data...");
+    
+    try {
+        const usersSnapshot = await db.collection('users').get();
+        let updated = 0;
+        
+        for (const doc of usersSnapshot.docs) {
+            const userData = doc.data();
+            const updates = {};
+            
+            if (userData.following && userData.following.length > 0) {
+                updates.following = [];
+                updated++;
+            }
+            if (userData.followers && userData.followers.length > 0) {
+                updates.followers = [];
+                updated++;
+            }
+            
+            if (Object.keys(updates).length > 0) {
+                await db.collection('users').doc(doc.id).update(updates);
+            }
+        }
+        
+        hideLoader();
+        showToast(`✅ Reset follow data for ${updated} users`);
+        
+        // লোকাল স্টোরেজও ক্লিয়ার করুন
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('user_')) {
+                try {
+                    const user = JSON.parse(localStorage.getItem(key));
+                    if (user) {
+                        user.following = [];
+                        user.followers = [];
+                        localStorage.setItem(key, JSON.stringify(user));
+                    }
+                } catch(e) {}
+            }
+        }
+        
+        // বর্তমান ইউজার আপডেট করুন
+        const currentUser = getActiveUser();
+        if (currentUser) {
+            currentUser.following = [];
+            currentUser.followers = [];
+            saveUser(currentUser);
+        }
+        
+        // প্রোফাইল রিফ্রেশ করুন
+        if (contentDiv.innerHTML.includes('Profile')) {
+            renderProfile();
+        }
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Reset error:", error);
+        showToast("Error resetting follow data");
+    }
+}
+
+// ========================================
+// 7. অ্যাডমিন প্যানেলে ফলো রিসেট বাটন যোগ করুন
+// ========================================
+
+function addFollowResetButtonToAdmin() {
+    setTimeout(() => {
+        const adminSection = document.querySelector('.admin-testing-section');
+        if (!adminSection) return;
+        
+        if (document.getElementById('followResetBtn')) return;
+        
+        const resetBtnHtml = `
+            <div style="margin-top: 15px; border-top: 1px solid #ff4444; padding-top: 15px;">
+                <button id="followResetBtn" onclick="resetAllFollowData()" 
+                    style="width: 100%; background: linear-gradient(135deg, #ff9800, #f44336); 
+                    color: white; border: none; padding: 12px; border-radius: 12px; 
+                    font-weight: bold; cursor: pointer; display: flex; align-items: center; 
+                    justify-content: center; gap: 8px;">
+                    <i class="fas fa-sync-alt"></i> 🔄 RESET ALL FOLLOW DATA
+                </button>
+                <p style="font-size: 11px; color: var(--muted-text); margin-top: 5px; text-align: center;">
+                    This will clear all following/follower relationships
+                </p>
+            </div>
+        `;
+        
+        adminSection.insertAdjacentHTML('beforeend', resetBtnHtml);
+    }, 1000);
+}
+
+// অ্যাডমিন প্যানেল ওভাররাইড
+const originalOpenAdminPanelFollow = window.openAdminPanel;
+if (originalOpenAdminPanelFollow) {
+    window.openAdminPanel = function() {
+        originalOpenAdminPanelFollow();
+        setTimeout(() => {
+            addFollowResetButtonToAdmin();
+        }, 500);
+    };
+}
+
+// ========================================
+// 8. ফায়ারবেসে ফলো ডাটা সিঙ্ক ফাংশন (ব্যাকগ্রাউন্ডে)
+// ========================================
+
+async function syncAllFollowDataToFirebase() {
+    showLoader("Syncing follow data...");
+    let synced = 0;
+    
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('user_')) {
+            try {
+                const user = JSON.parse(localStorage.getItem(key));
+                if (user && user.username) {
+                    await db.collection('users').doc(user.username).set({
+                        following: user.following || [],
+                        followers: user.followers || []
+                    }, { merge: true });
+                    synced++;
+                }
+            } catch(e) {
+                console.error("Sync error:", e);
+            }
+        }
+    }
+    
+    hideLoader();
+    showToast(`✅ Synced ${synced} users to Firebase`);
+}
+
+// ========================================
+// 9. ফলো বাটন ভিজুয়াল ইফেক্ট
+// ========================================
+
+// CSS যোগ করুন (যদি না থাকে)
+if (!document.getElementById('followAnimationStyle')) {
+    const followStyle = document.createElement('style');
+    followStyle.id = 'followAnimationStyle';
+    followStyle.textContent = `
+        .follow-btn, .follow-small-btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .follow-btn:active, .follow-small-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .follow-btn.following, .follow-small-btn.following {
+            background: transparent !important;
+            border: 1.5px solid var(--primary) !important;
+            color: var(--primary) !important;
+        }
+        
+        .follow-btn::after, .follow-small-btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+        
+        .follow-btn:active::after, .follow-small-btn:active::after {
+            width: 100%;
+            height: 100%;
+        }
+    `;
+    document.head.appendChild(followStyle);
+}
+
+// ========================================
+// 10. ফলোয়ার লিস্ট দেখানোর ফাংশন
+// ========================================
+
+async function showFollowersList(username) {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    showLoader("Loading followers...");
+    
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (!userDoc.exists) {
+            hideLoader();
+            showToast("User not found");
+            return;
+        }
+        
+        const followers = userDoc.data().followers || [];
+        const followerDetails = [];
+        
+        for (const followerUsername of followers) {
+            const followerDoc = await db.collection('users').doc(followerUsername).get();
+            if (followerDoc.exists) {
+                followerDetails.push(followerDoc.data());
+            }
+        }
+        
+        hideLoader();
+        
+        let html = `
+            <div id="followListModal" class="modal-overlay" style="display: flex; z-index: 10000;">
+                <div class="bottom-modal" style="max-height: 80vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative;">
+                        <h3 style="margin: 0;"><i class="fas fa-users"></i> Followers (${followers.length})</h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeFollowListModal()"></i>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;">
+        `;
+        
+        if (followerDetails.length === 0) {
+            html += `<div style="text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-user-slash" style="font-size: 50px; margin-bottom: 10px;"></i>
+                        <p>No followers yet</p>
+                     </div>`;
+        } else {
+            followerDetails.forEach(follower => {
+                const isFollowing = user.following && user.following.includes(follower.username);
+                const avatarColor = stringToColor(follower.username);
+                const letter = follower.username.replace('@', '').charAt(0).toUpperCase();
+                
+                html += `
+                    <div class="user-card" style="margin-bottom: 12px; cursor: pointer;" onclick="viewOtherProfile('${follower.username}'); closeFollowListModal();">
+                        <div class="user-avatar-lg" style="background: ${avatarColor}; display: flex; align-items: center; justify-content: center;">
+                            ${follower.profilePic ? `<img src="${follower.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : letter}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${escapeHtml(follower.name || follower.username)}</div>
+                            <div class="user-username">${follower.username}</div>
+                        </div>
+                        <button class="follow-small-btn ${isFollowing ? 'following' : ''}" 
+                            onclick="event.stopPropagation(); handleFollow('${follower.username}', this)">
+                            ${isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+      </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('followListModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading followers:", error);
+        showToast("Failed to load followers");
+    }
+}
+
+async function showFollowingList(username) {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    showLoader("Loading following...");
+    
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        if (!userDoc.exists) {
+            hideLoader();
+            showToast("User not found");
+            return;
+        }
+        
+        const following = userDoc.data().following || [];
+        const followingDetails = [];
+        
+        for (const followingUsername of following) {
+            const followingDoc = await db.collection('users').doc(followingUsername).get();
+            if (followingDoc.exists) {
+                followingDetails.push(followingDoc.data());
+            }
+        }
+        
+        hideLoader();
+        
+        let html = `
+            <div id="followListModal" class="modal-overlay" style="display: flex; z-index: 10000;">
+                <div class="bottom-modal" style="max-height: 80vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative;">
+                        <h3 style="margin: 0;"><i class="fas fa-user-friends"></i> Following (${following.length})</h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeFollowListModal()"></i>
+                    </div>
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;">
+        `;
+        
+        if (followingDetails.length === 0) {
+            html += `<div style="text-align: center; padding: 40px; color: var(--muted-text);">
+                        <i class="fas fa-user-plus" style="font-size: 50px; margin-bottom: 10px;"></i>
+                        <p>Not following anyone yet</p>
+                     </div>`;
+        } else {
+            followingDetails.forEach(followingUser => {
+                const isFollowing = user.following && user.following.includes(followingUser.username);
+                const avatarColor = stringToColor(followingUser.username);
+                const letter = followingUser.username.replace('@', '').charAt(0).toUpperCase();
+                
+                html += `
+                    <div class="user-card" style="margin-bottom: 12px; cursor: pointer;" onclick="viewOtherProfile('${followingUser.username}'); closeFollowListModal();">
+                        <div class="user-avatar-lg" style="background: ${avatarColor}; display: flex; align-items: center; justify-content: center;">
+                            ${followingUser.profilePic ? `<img src="${followingUser.profilePic}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">` : letter}
+                        </div>
+                        <div class="user-info">
+                            <div class="user-name">${escapeHtml(followingUser.name || followingUser.username)}</div>
+                            <div class="user-username">${followingUser.username}</div>
+                        </div>
+                        <button class="follow-small-btn ${isFollowing ? 'following' : ''}" 
+                            onclick="event.stopPropagation(); handleFollow('${followingUser.username}', this)">
+                            ${isFollowing ? 'Following' : 'Follow'}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        html += `
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('followListModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading following:", error);
+        showToast("Failed to load following");
+    }
+}
+
+function closeFollowListModal() {
+    const modal = document.getElementById('followListModal');
+    if (modal) modal.remove();
+}
+
+// ========================================
+// 11. প্রোফাইলে ফলোয়ার/ফলোইং ক্লিকযোগ্য করুন
+// ========================================
+
+function makeFollowStatsClickable() {
+    setTimeout(() => {
+        const statBoxes = document.querySelectorAll('.stat-box');
+        if (statBoxes.length >= 2) {
+            // ফলোয়ার বক্স (প্রথম বা দ্বিতীয়টি - আপনার ডিজাইন অনুযায়ী)
+            const user = getActiveUser();
+            if (user) {
+                // ফলোয়ার বক্সে ক্লিক ইভেন্ট যোগ করুন
+                if (statBoxes[0] && !statBoxes[0].hasAttribute('data-clickable')) {
+                    statBoxes[0].setAttribute('data-clickable', 'true');
+                    statBoxes[0].style.cursor = 'pointer';
+                    statBoxes[0].onclick = () => showFollowersList(user.username);
+                }
+                
+                // ফলোইং বক্সে ক্লিক ইভেন্ট যোগ করুন
+                if (statBoxes[1] && !statBoxes[1].hasAttribute('data-clickable')) {
+                    statBoxes[1].setAttribute('data-clickable', 'true');
+                    statBoxes[1].style.cursor = 'pointer';
+                    statBoxes[1].onclick = () => showFollowingList(user.username);
+                }
+            }
+        }
+    }, 500);
+}
+
+// প্রোফাইল রেন্ডার করার সময় স্ট্যাটাস ক্লিকযোগ্য করুন
+const originalRenderProfileForFollow = window.renderProfile;
+if (originalRenderProfileForFollow) {
+    window.renderProfile = async function() {
+        await originalRenderProfileForFollow();
+        makeFollowStatsClickable();
+    };
+}
+
+// অন্যের প্রোফাইল দেখার সময়
+const originalViewOtherProfileForFollow = window.viewOtherProfile;
+if (originalViewOtherProfileForFollow) {
+    window.viewOtherProfile = async function(username) {
+        await originalViewOtherProfileForFollow(username);
+        makeFollowStatsClickable();
+    };
+}
+
+// ========================================
+// 12. গ্লোবাল ফাংশন এক্সপোর্ট
+// ========================================
+
+window.startRealtimeFollowListener = startRealtimeFollowListener;
+window.syncFollowDataToLocalStorage = syncFollowDataToLocalStorage;
+window.syncAllFollowDataToFirebase = syncAllFollowDataToFirebase;
+window.resetAllFollowData = resetAllFollowData;
+window.showFollowersList = showFollowersList;
+window.showFollowingList = showFollowingList;
+window.closeFollowListModal = closeFollowListModal;
+
+console.log("✅ Real-Time Follow/Followers System Loaded Successfully!");
+// ========================================
+// FIXED DAILY STAR CLAIM - WORKING VERSION
+// ========================================
+
+// ওভাররাইড claimDailyStar ফাংশন
+const originalClaimDailyStar = window.claimDailyStar;
+window.claimDailyStar = function(index, element) {
+    const user = getActiveUser();
+    if (!user) {
+        showToast('Please login first');
+        return;
+    }
+    
+    const dailyStars = checkAndResetDailyStars(user);
+    
+    if (dailyStars.claimed[index]) {
+        showToast('Already claimed today!');
+        return;
+    }
+    
+    // স্টোর করুন
+    window.currentClaimIndex = index;
+    window.currentClaimElement = element;
+    
+    // VIP চেক
+    if (user.vip && user.vip.expiryDate > Date.now()) {
+        const plan = VIP_PLANS[user.vip.level];
+        if (plan && plan.dailyStar > 1) {
+            processVipDailyStarClaim();
+            return;
+        }
+    }
+    
+    // অ্যাড দেখানোর জন্য (AndroidBridge থাকলে)
+    if (typeof AndroidBridge !== "undefined") {
+        AndroidBridge.showRewardAd();
+    } else {
+        processNormalDailyStarClaim();
+    }
+};
+
+function processNormalDailyStarClaim() {
+    const index = window.currentClaimIndex;
+    const element = window.currentClaimElement;
+    const user = getActiveUser();
+    
+    if (!user) return;
+    
+    const dailyStars = checkAndResetDailyStars(user);
+    
+    if (dailyStars.claimed[index]) {
+        showToast('Already claimed today!');
+        return;
+    }
+    
+    // 1 স্টার যোগ করুন
+    dailyStars.claimed[index] = true;
+    user.starBalance = (user.starBalance || 0) + 1;
+    user.pCoinBalance = (user.pCoinBalance || 0) + 1;
+    
+    // ট্রানজেকশন যোগ করুন
+    if (!user.transactions) user.transactions = [];
+    user.transactions.unshift({
+        type: 'received',
+        amount: 1,
+        title: 'Daily Star Claim',
+        timestamp: Date.now(),
+        time: new Date().toLocaleString()
+    });
+    
+    // সেভ করুন
+    saveUser(user);
+    
+    // Firebase সিঙ্ক
+    db.collection('users').doc(user.username).update({
+        starBalance: user.starBalance,
+        pCoinBalance: user.pCoinBalance,
+        transactions: user.transactions,
+        dailyStars: user.dailyStars
+    }).catch(e => console.log("Firebase sync error:", e));
+    
+    // UI আপডেট
+    if (element) {
+        element.classList.remove('available');
+        element.classList.add('claimed');
+        element.style.pointerEvents = 'none';
+    }
+    
+    addNotification(user.username, '🌟 Daily Star', 'Claimed 1 Free Star today!', 'fas fa-star', '#ffd700', 'star');
+    
+    const balanceEl = document.getElementById('profilePcoinBalance');
+    if (balanceEl) balanceEl.innerText = user.pCoinBalance || 0;
+    
+    showToast("Congratulations! You earned 1 Star! 🌟");
+    
+    // রিফ্রেশ ডেইলি স্টার UI
+    refreshDailyStarsUI();
+}
+
+function refreshDailyStarsUI() {
+    const container = document.getElementById('profileDailyStarContainer');
+    if (container) {
+        const user = getActiveUser();
+        if (user) {
+            container.innerHTML = renderDailyStarsUI(user);
+        }
+    }
+}
+// ========================================
+// FIXED FLOATING STAR - WORKING VERSION
+// ========================================
+
+// ফ্লোটিং স্টার টাইমার ভেরিয়েবল
+let floatingStarInterval = null;
+let floatingStarProgress = 0;
+let floatingStarStartTime = 0;
+const FLOATING_STAR_INTERVAL = 20000; // 20 সেকেন্ড
+
+// ওভাররাইড initFloatingStar
+const originalInitFloatingStar = window.initFloatingStar;
+window.initFloatingStar = function() {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    // টুডে ডাটা চেক
+    const today = new Date().toDateString();
+    if (!user.floatingStarData || user.floatingStarData.date !== today) {
+        user.floatingStarData = { date: today, earned: 0 };
+        saveUser(user);
+    }
+    
+    const container = document.getElementById('floatingStarContainer');
+    const starText = document.getElementById('floatingStarText');
+    const circle = document.querySelector('.progress-ring__circle');
+    
+    if (!container || !circle) return;
+    
+    // হোমপেজ চেক
+    if (document.getElementById('feedContainer')) {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+        stopFloatingStarTimer();
+        return;
+    }
+    
+    // লিমিট চেক
+    if (user.floatingStarData.earned >= 50) {
+        if (starText) starText.innerText = `Limit Reached (50/50)`;
+        if (circle) {
+            circle.style.strokeDashoffset = 0;
+            circle.style.stroke = "#2ecc71";
+        }
+        stopFloatingStarTimer();
+        return;
+    }
+    
+    if (starText) starText.innerText = `${user.floatingStarData.earned}/50`;
+    if (circle) circle.style.stroke = "#ffd700";
+    
+    startFloatingStarTimer();
+};
+
+function startFloatingStarTimer() {
+    stopFloatingStarTimer();
+    
+    const circle = document.querySelector('.progress-ring__circle');
+    if (!circle) return;
+    
+    const circumference = 163.36;
+    circle.style.strokeDasharray = circumference;
+    circle.style.strokeDashoffset = circumference;
+    
+    floatingStarProgress = 0;
+    floatingStarStartTime = Date.now();
+    
+    floatingStarInterval = setInterval(() => {
+        // ভিডিও প্লেয়িং চেক
+        const videos = document.querySelectorAll('video');
+        let isPlaying = false;
+        for (let video of videos) {
+            if (!video.paused && video.currentTime > 0 && !video.ended) {
+                isPlaying = true;
+                break;
+            }
+        }
+        
+        if (!isPlaying) {
+            if (circle && floatingStarProgress > 0) {
+                circle.style.strokeDashoffset = circumference;
+                floatingStarProgress = 0;
+                floatingStarStartTime = Date.now();
+            }
+            return;
+        }
+        
+        const elapsed = Date.now() - floatingStarStartTime;
+        
+        if (elapsed >= FLOATING_STAR_INTERVAL) {
+            giveFloatingStarRewardFixed();
+            floatingStarStartTime = Date.now();
+            floatingStarProgress = 0;
+            circle.style.strokeDashoffset = circumference;
+        } else {
+            const progressPercent = elapsed / FLOATING_STAR_INTERVAL;
+            const offset = circumference - (progressPercent * circumference);
+            circle.style.strokeDashoffset = offset;
+            floatingStarProgress = elapsed;
+        }
+    }, 100);
+}
+
+function stopFloatingStarTimer() {
+    if (floatingStarInterval) {
+        clearInterval(floatingStarInterval);
+        floatingStarInterval = null;
+    }
+    floatingStarProgress = 0;
+}
+
+function giveFloatingStarRewardFixed() {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    // লিমিট চেক
+    if (user.floatingStarData.earned >= 50) {
+        stopFloatingStarTimer();
+        return;
+    }
+    
+    let rewardAmount = 2;
+    
+    // VIP বুস্ট
+    if (user.vip && user.vip.expiryDate > Date.now()) {
+        const plan = VIP_PLANS[user.vip.level];
+        if (plan) {
+            rewardAmount = plan.floatingStar;
+        }
+    }
+    
+    // আপডেট
+    user.starBalance = (user.starBalance || 0) + rewardAmount;
+    user.pCoinBalance = (user.pCoinBalance || 0) + rewardAmount;
+    user.floatingStarData.earned += rewardAmount;
+    
+    // ট্রানজেকশন
+    if (!user.transactions) user.transactions = [];
+    user.transactions.unshift({
+        type: 'received',
+        amount: rewardAmount,
+        title: user.vip ? `🎖️ VIP Floating Star (${user.vip.planName})` : '🌟 Floating Star Reward',
+        timestamp: Date.now(),
+        time: new Date().toLocaleString()
+    });
+    
+    saveUser(user);
+    
+    // Firebase সিঙ্ক
+    db.collection('users').doc(user.username).set({
+        starBalance: user.starBalance,
+        pCoinBalance: user.pCoinBalance,
+        floatingStarData: user.floatingStarData,
+        transactions: user.transactions
+    }, { merge: true }).catch(e => console.log("Firebase sync error:", e));
+    
+    // UI আপডেট
+    updateWalletUI(user);
+    
+    // অ্যানিমেশন
+    const container = document.getElementById('floatingStarContainer');
+    if (container) {
+        const pop = document.createElement('div');
+        pop.className = 'star-pop-anim';
+        pop.innerText = `+${rewardAmount} ⭐`;
+        pop.style.position = 'absolute';
+        pop.style.top = '0';
+        pop.style.left = '50%';
+        pop.style.transform = 'translateX(-50%)';
+        pop.style.color = '#ffd700';
+        pop.style.fontWeight = 'bold';
+        pop.style.fontSize = '14px';
+        pop.style.animation = 'floatUpFade 0.8s forwards';
+        pop.style.pointerEvents = 'none';
+        container.appendChild(pop);
+        setTimeout(() => pop.remove(), 800);
+    }
+    
+    // টেক্সট আপডেট
+    const starText = document.getElementById('floatingStarText');
+    if (starText) {
+        starText.innerText = `${user.floatingStarData.earned}/50`;
+    }
+    
+    // লিমিট চেক
+    if (user.floatingStarData.earned >= 50) {
+        stopFloatingStarTimer();
+        const circle = document.querySelector('.progress-ring__circle');
+        if (circle) {
+            circle.style.strokeDashoffset = 0;
+        }
+        if (starText) starText.innerText = `Limit Reached (50/50)`;
+    }
+    
+    showToast(`✨ +${rewardAmount} Stars & P Coins!`, 1500);
+}
+
+// CSS অ্যানিমেশন যোগ করুন
+if (!document.getElementById('floatingStarFixedStyle')) {
+    const style = document.createElement('style');
+    style.id = 'floatingStarFixedStyle';
+    style.textContent = `
+        @keyframes floatUpFade {
+            0% {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-40px);
+            }
+        }
+        .star-pop-anim {
+            pointer-events: none;
+            z-index: 10000;
+        }
+    `;
+    document.head.appendChild(style);
+}
+// ========================================
+// USER POST MANAGER - VIEW, LIKE, DELETE
+// ========================================
+
+async function showUserPostsManager(username) {
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
+    
+    showLoader("Loading user videos...");
+    
+    try {
+        const videosSnapshot = await db.collection('videos')
+            .where('username', '==', username)
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        const videos = [];
+        videosSnapshot.forEach(doc => {
+            const data = doc.data();
+            videos.push({
+                id: doc.id,
+                url: data.video_url || data.url,
+                caption: data.caption || '',
+                username: data.username,
+                likes: data.likes_count || 0,
+                comments: data.comment_count || 0,
+                createdAt: data.createdAt,
+                thumbnail_time: data.thumbnail_time || 1
+            });
+        });
+        
+        hideLoader();
+        
+        const isOwnProfile = (username === currentUser.username);
+        
+        let html = `
+            <div id="userPostsManagerModal" class="modal-overlay" style="display: flex; z-index: 100000;">
+                <div class="bottom-modal" style="max-height: 85vh; display: flex; flex-direction: column;">
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative; background: var(--secondary-bg);">
+                        <h3 style="margin: 0;">
+                            <i class="fas fa-video"></i> 
+                            ${isOwnProfile ? 'My Videos' : `${username}'s Videos`} 
+                            (${videos.length})
+                        </h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer;" onclick="closeUserPostsManager()"></i>
+                    </div>
+                    
+                    <!-- Search Box -->
+                    <div style="padding: 12px 15px; background: var(--input-bg); border-bottom: 1px solid var(--border);">
+                        <input type="text" id="userPostsSearch" placeholder="🔍 Search by caption..." 
+                            style="width: 100%; padding: 10px 15px; border-radius: 25px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none;"
+                            onkeyup="filterUserPostsList()">
+                    </div>
+                    
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;" id="userPostsListContainer">
+                        ${generateUserPostsHTML(videos, isOwnProfile)}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        const existingModal = document.getElementById('userPostsManagerModal');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', html);
+        
+        // স্টোর করুন
+        window.currentUserPostsList = videos;
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading user videos:", error);
+        showToast("Failed to load videos");
+    }
+}
+
+function generateUserPostsHTML(videos, isOwnProfile) {
+    if (!videos || videos.length === 0) {
+        return `
+            <div style="text-align: center; padding: 60px 20px;">
+                <i class="fas fa-video-slash" style="font-size: 60px; color: var(--muted-text); margin-bottom: 20px;"></i>
+                <h3 style="color: var(--muted-text);">No videos yet</h3>
+                <p style="color: var(--muted-text);">This user hasn't uploaded any videos</p>
+            </div>
+        `;
+    }
+    
+    let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+    
+    videos.forEach((video, index) => {
+        const date = video.createdAt ? new Date(video.createdAt.toDate()).toLocaleDateString() : 'Unknown';
+        const time = video.createdAt ? new Date(video.createdAt.toDate()).toLocaleTimeString() : '';
+        const thumbnailUrl = getThumbnailUrl(video.url, video.thumbnail_time || 1);
+        
+        html += `
+            <div class="user-post-card" data-post-id="${video.id}" style="background: var(--secondary-bg); border-radius: 15px; padding: 15px; border: 1px solid var(--border);">
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <!-- Thumbnail -->
+                    <div style="width: 100px; height: 178px; background: #000; border-radius: 10px; overflow: hidden; flex-shrink: 0;">
+                        <video src="${video.url}" poster="${thumbnailUrl}" muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    </div>
+                    
+                    <!-- Details -->
+                    <div style="flex: 1; min-width: 180px;">
+                        <div style="margin-bottom: 8px;">
+                            <span style="background: var(--primary); padding: 2px 10px; border-radius: 12px; font-size: 11px;">#${index + 1}</span>
+                        </div>
+                        
+                        <div style="color: var(--text); margin-bottom: 10px; word-break: break-word;">
+                            ${escapeHtml(video.caption) || '<span style="color: var(--muted-text);">No caption</span>'}
+                        </div>
+                        
+                        <div style="display: flex; gap: 20px; font-size: 13px; color: var(--muted-text); margin-bottom: 8px;">
+                            <span><i class="fas fa-heart" style="color: #fe2c55;"></i> ${formatNumber(video.likes)}</span>
+                            <span><i class="fas fa-comment"></i> ${formatNumber(video.comments)}</span>
+                            <span><i class="far fa-calendar"></i> ${date}</span>
+                            <span><i class="far fa-clock"></i> ${time}</span>
+                        </div>
+                        
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button onclick="playUserPostVideo('${video.url}')" 
+                                style="background: var(--primary); border: none; color: white; padding: 6px 15px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+                                <i class="fas fa-play"></i> Play
+                            </button>
+                            ${isOwnProfile ? `
+                                <button onclick="deleteUserPost('${video.id}')" 
+                                    style="background: #ff4444; border: none; color: white; padding: 6px 15px; border-radius: 8px; cursor: pointer; font-size: 12px;">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+function filterUserPostsList() {
+    const searchTerm = document.getElementById('userPostsSearch')?.value.toLowerCase() || '';
+    const videos = window.currentUserPostsList || [];
+    
+    const filtered = videos.filter(video => 
+        video.caption && video.caption.toLowerCase().includes(searchTerm)
+    );
+    
+    const isOwnProfile = document.querySelector('#userPostsManagerModal')?.innerHTML.includes("My Videos") || false;
+    
+    const container = document.getElementById('userPostsListContainer');
+    if (container) {
+        container.innerHTML = generateUserPostsHTML(filtered, isOwnProfile);
+    }
+}
+
+function playUserPostVideo(url) {
+    const playerHtml = `
+        <div id="userPostVideoPlayer" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 100001; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-times" style="position: absolute; top: 20px; right: 20px; font-size: 30px; color: white; cursor: pointer; z-index: 100002;" onclick="closeUserPostVideoPlayer()"></i>
+            <video src="${url}" controls autoplay style="max-width: 95%; max-height: 95%; border-radius: 10px;"></video>
+        </div>
+    `;
+    
+    const existing = document.getElementById('userPostVideoPlayer');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', playerHtml);
+}
+
+function closeUserPostVideoPlayer() {
+    const player = document.getElementById('userPostVideoPlayer');
+    if (player) player.remove();
+}
+
+async function deleteUserPost(videoId) {
+    if (!confirm("Are you sure you want to delete this video? This action cannot be undone!")) {
+        return;
+    }
+    
+    showLoader("Deleting video...");
+    
+    try {
+        await db.collection('videos').doc(videoId).delete();
+        
+        hideLoader();
+        showToast("✅ Video deleted successfully!");
+        
+        // রিফ্রেশ লিস্ট
+        const currentUser = getActiveUser();
+        if (currentUser) {
+            closeUserPostsManager();
+            setTimeout(() => showUserPostsManager(currentUser.username), 500);
+        }
+        
+        // পোস্ট কাউন্ট আপডেট
+        updatePostCount();
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Delete error:", error);
+        showToast("Failed to delete video: " + error.message);
+    }
+}
+
+function closeUserPostsManager() {
+    const modal = document.getElementById('userPostsManagerModal');
+    if (modal) modal.remove();
+}
+
+// ওভাররাইড showPostsList
+const originalShowPostsList = window.showPostsList;
+window.showPostsList = function() {
+    const user = getActiveUser();
+    if (user) {
+        showUserPostsManager(user.username);
+    }
+};
+
+// প্রোফাইলের পোস্ট বক্সে ক্লিক করলে
+function updatePostCount() {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    db.collection('videos').where('username', '==', user.username).get()
+        .then(snapshot => {
+            const postsSpan = document.getElementById('profilePostsCount');
+            if (postsSpan) {
+                postsSpan.innerText = snapshot.size;
+            }
+        })
+        .catch(e => console.log("Error updating post count:", e));
+}
+// ========================================
+// SIMPLE USER POST MANAGER - WORKING VERSION
+// ========================================
+
+// পোস্ট লিস্ট দেখানোর ফাংশন (প্রোফাইলের পোস্ট নাম্বারে ক্লিক করলে)
+async function showUserPostsList(username) {
+    const currentUser = getActiveUser();
+    if (!currentUser) return;
+    
+    showLoader("Loading videos...");
+    
+    try {
+        // ইউজারের সব ভিডিও আনা
+        const videosSnapshot = await db.collection('videos')
+            .where('username', '==', username)
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        const videos = [];
+        videosSnapshot.forEach(doc => {
+            const data = doc.data();
+            videos.push({
+                id: doc.id,
+                url: data.video_url || data.url,
+                caption: data.caption || 'No caption',
+                username: data.username,
+                likes: data.likes_count || 0,
+                comments: data.comment_count || 0,
+                createdAt: data.createdAt,
+                thumbnail_time: data.thumbnail_time || 1
+            });
+        });
+        
+        hideLoader();
+        
+        const isOwnProfile = (username === currentUser.username);
+        
+        // মডাল HTML তৈরি
+        let modalHtml = `
+            <div id="postsModalNew" class="modal-overlay" style="display: flex; z-index: 100000;">
+                <div class="bottom-modal" style="max-height: 85vh; display: flex; flex-direction: column; width: 100%; max-width: 500px; margin: 0 auto;">
+                    
+                    <!-- Header -->
+                    <div style="padding: 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative; background: var(--secondary-bg); border-radius: 22px 22px 0 0;">
+                        <h3 style="margin: 0; font-size: 18px;">
+                            <i class="fas fa-video" style="color: var(--primary);"></i> 
+                            ${isOwnProfile ? 'আমার ভিডিও' : `${username.replace('@', '')} এর ভিডিও`} 
+                            <span style="background: var(--primary); padding: 2px 10px; border-radius: 20px; font-size: 12px; margin-left: 8px;">${videos.length}</span>
+                        </h3>
+                        <i class="fas fa-times" style="position: absolute; right: 20px; top: 18px; font-size: 20px; cursor: pointer; color: var(--muted-text);" onclick="closePostsModalNew()"></i>
+                    </div>
+                    
+                    <!-- Search Box -->
+                    <div style="padding: 12px 15px; background: var(--input-bg); border-bottom: 1px solid var(--border);">
+                        <input type="text" id="postsSearchInput" placeholder="🔍 ক্যাপশন দিয়ে খুঁজুন..." 
+                            style="width: 100%; padding: 10px 15px; border-radius: 25px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; font-size: 13px;">
+                    </div>
+                    
+                    <!-- Videos List -->
+                    <div style="flex: 1; overflow-y: auto; padding: 15px;" id="postsListContainer">
+                        ${generatePostsListHTML(videos, isOwnProfile)}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // আগের মডাল থাকলে রিমুভ
+        const existingModal = document.getElementById('postsModalNew');
+        if (existingModal) existingModal.remove();
+        
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        
+        // সার্চ ইভেন্ট
+        const searchInput = document.getElementById('postsSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keyup', function() {
+                filterPostsList(videos, isOwnProfile);
+            });
+        }
+        
+        // ভিডিও লিস্ট স্টোর করুন
+        window.currentPostsList = videos;
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Error loading posts:", error);
+        showToast("ভিডিও লোড করতে সমস্যা হয়েছে");
+    }
+}
+
+// পোস্ট লিস্ট HTML জেনারেট
+function generatePostsListHTML(videos, isOwnProfile) {
+    if (!videos || videos.length === 0) {
+        return `
+            <div style="text-align: center; padding: 60px 20px;">
+                <i class="fas fa-video-slash" style="font-size: 60px; color: var(--muted-text); margin-bottom: 20px;"></i>
+                <h3 style="color: var(--muted-text); font-size: 18px;">কোনো ভিডিও নেই</h3>
+                <p style="color: var(--muted-text); font-size: 13px;">এই ইউজার এখনো কোনো ভিডিও আপলোড করেনি</p>
+            </div>
+        `;
+    }
+    
+    let html = '<div style="display: flex; flex-direction: column; gap: 12px;">';
+    
+    videos.forEach((video, index) => {
+        // তারিখ ফরম্যাট
+        let dateStr = 'তারিখ নেই';
+        if (video.createdAt && video.createdAt.toDate) {
+            const date = video.createdAt.toDate();
+            dateStr = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
+        }
+        
+        // থাম্বনেইল ইউআরএল
+        const thumbnailUrl = getThumbnailUrl(video.url, video.thumbnail_time || 1);
+        
+        html += `
+            <div class="post-item-card" data-post-id="${video.id}" style="background: var(--secondary-bg); border-radius: 15px; padding: 12px; border: 1px solid var(--border); transition: all 0.2s;">
+                <div style="display: flex; gap: 12px;">
+                    <!-- থাম্বনেইল -->
+                    <div style="width: 80px; height: 142px; background: #000; border-radius: 10px; overflow: hidden; flex-shrink: 0;">
+                        <video src="${video.url}" poster="${thumbnailUrl}" muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+                    </div>
+                    
+                    <!-- তথ্য -->
+                    <div style="flex: 1;">
+                        <div style="margin-bottom: 6px;">
+                            <span style="background: ${stringToColor(video.username)}; padding: 2px 10px; border-radius: 12px; font-size: 10px; color: white;">#${index + 1}</span>
+                        </div>
+                        
+                        <div style="color: var(--text); font-size: 13px; margin-bottom: 8px; word-break: break-word; line-height: 1.4; max-height: 40px; overflow: hidden;">
+                            ${escapeHtml(video.caption)}
+                        </div>
+                        
+                        <div style="display: flex; gap: 15px; font-size: 12px; color: var(--muted-text); margin-bottom: 8px;">
+                            <span><i class="fas fa-heart" style="color: #fe2c55;"></i> ${formatNumber(video.likes)}</span>
+                            <span><i class="fas fa-comment"></i> ${formatNumber(video.comments)}</span>
+                            <span><i class="far fa-calendar-alt"></i> ${dateStr}</span>
+                        </div>
+                        
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button onclick="playPostVideo('${video.url}')" 
+                                style="background: var(--primary); border: none; color: white; padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 11px;">
+                                <i class="fas fa-play"></i> চালান
+                            </button>
+                            ${isOwnProfile ? `
+                                <button onclick="deletePostVideo('${video.id}')" 
+                                    style="background: #ff4444; border: none; color: white; padding: 5px 12px; border-radius: 8px; cursor: pointer; font-size: 11px;">
+                                    <i class="fas fa-trash"></i> ডিলিট
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    return html;
+}
+
+// পোস্ট ফিল্টার
+function filterPostsList(allVideos, isOwnProfile) {
+    const searchTerm = document.getElementById('postsSearchInput')?.value.toLowerCase() || '';
+    
+    const filtered = allVideos.filter(video => 
+        video.caption.toLowerCase().includes(searchTerm)
+    );
+    
+    const container = document.getElementById('postsListContainer');
+    if (container) {
+        container.innerHTML = generatePostsListHTML(filtered, isOwnProfile);
+    }
+}
+
+// ভিডিও প্লে
+function playPostVideo(url) {
+    const playerHtml = `
+        <div id="postVideoPlayer" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.98); z-index: 100001; display: flex; align-items: center; justify-content: center;">
+            <i class="fas fa-times" style="position: absolute; top: 20px; right: 20px; font-size: 30px; color: white; cursor: pointer; z-index: 100002;" onclick="closePostVideoPlayer()"></i>
+            <video src="${url}" controls autoplay style="max-width: 95%; max-height: 95%; border-radius: 10px;"></video>
+        </div>
+    `;
+    
+    const existing = document.getElementById('postVideoPlayer');
+    if (existing) existing.remove();
+    
+    document.body.insertAdjacentHTML('beforeend', playerHtml);
+}
+
+function closePostVideoPlayer() {
+    const player = document.getElementById('postVideoPlayer');
+    if (player) player.remove();
+}
+
+// ভিডিও ডিলিট
+async function deletePostVideo(videoId) {
+    if (!confirm("⚠️ ভিডিও ডিলিট করুন?\n\nএটি স্থায়ীভাবে মুছে ফেলা হবে!")) {
+        return;
+    }
+    
+    showLoader("ভিডিও ডিলিট করা হচ্ছে...");
+    
+    try {
+        await db.collection('videos').doc(videoId).delete();
+        
+        hideLoader();
+        showToast("✅ ভিডিও ডিলিট হয়েছে!");
+        
+        // মডাল বন্ধ করে আবার খোলা
+        closePostsModalNew();
+        
+        setTimeout(() => {
+            const user = getActiveUser();
+            if (user) {
+                showUserPostsList(user.username);
+            }
+        }, 500);
+        
+        // পোস্ট কাউন্ট আপডেট
+        updateProfilePostCount();
+        
+    } catch(error) {
+        hideLoader();
+        console.error("Delete error:", error);
+        showToast("❌ ভিডিও ডিলিট করতে সমস্যা হয়েছে");
+    }
+}
+
+function closePostsModalNew() {
+    const modal = document.getElementById('postsModalNew');
+    if (modal) modal.remove();
+}
+
+// প্রোফাইলের পোস্ট কাউন্ট আপডেট
+async function updateProfilePostCount() {
+    const user = getActiveUser();
+    if (!user) return;
+    
+    try {
+        const snapshot = await db.collection('videos').where('username', '==', user.username).get();
+        const postsSpan = document.getElementById('profilePostsCount');
+        if (postsSpan) {
+            postsSpan.innerText = snapshot.size;
+        }
+    } catch(e) {
+        console.log("Error updating post count:", e);
+    }
+}
+
+// ========================================
+// প্রোফাইলের স্ট্যাটাস রো আপডেট (পোস্ট, ফলোয়ার, ফলোইং ক্লিকযোগ্য)
+// ========================================
+
+// ওভাররাইড renderProfile যাতে স্ট্যাটাস ক্লিকযোগ্য হয়
+const originalRenderProfileForPosts = window.renderProfile;
+if (originalRenderProfileForPosts) {
+    window.renderProfile = async function() {
+        await originalRenderProfileForPosts();
+        makeProfileStatsClickableForPosts();
+    };
+}
+
+function makeProfileStatsClickableForPosts() {
+    setTimeout(() => {
+        const user = getActiveUser();
+        if (!user) return;
+        
+        // পোস্ট বক্সে ক্লিক ইভেন্ট
+        const postsBox = document.querySelector('.profile-stat-box:first-child');
+        if (postsBox && !postsBox.hasAttribute('data-posts-clickable')) {
+            postsBox.setAttribute('data-posts-clickable', 'true');
+            postsBox.style.cursor = 'pointer';
+            postsBox.onclick = () => showUserPostsList(user.username);
+        }
+        
+        // ফলোয়ার বক্স
+        const followersBox = document.querySelector('.profile-stat-box:nth-child(2)');
+        if (followersBox && !followersBox.hasAttribute('data-clickable')) {
+            followersBox.setAttribute('data-clickable', 'true');
+            followersBox.style.cursor = 'pointer';
+            followersBox.onclick = () => showFollowersList(user.username);
+        }
+        
+        // ফলোইং বক্স
+        const followingBox = document.querySelector('.profile-stat-box:nth-child(3)');
+        if (followingBox && !followingBox.hasAttribute('data-clickable')) {
+            followingBox.setAttribute('data-clickable', 'true');
+            followingBox.style.cursor = 'pointer';
+            followingBox.onclick = () => showFollowingList(user.username);
+        }
+    }, 800);
+}
+
+// ========================================
+// 🔥 গোল্ডেন থিম শর্টকাট - একবার বসালেই হবে (ULTIMATE FIX)
+// ========================================
+
+(function() {
+    console.log("🟡 গোল্ডেন থিম এক্টিভেট করা হচ্ছে...");
+    
+    // ========================================
+    // ১. গোল্ডেন থিমের CSS যোগ করুন
+    // ========================================
+    const goldenStyle = document.createElement('style');
+    goldenStyle.textContent = `
+        /* গোল্ডেন থিমের CSS */
+        #toastMessage {
+            background: linear-gradient(135deg, #1a1a2e, #16213e) !important;
+            color: #FFD700 !important;
+            border: 1px solid rgba(255, 215, 0, 0.5) !important;
+            border-radius: 50px !important;
+            padding: 14px 28px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 10px 30px rgba(255, 215, 0, 0.2) !important;
+            backdrop-filter: blur(10px) !important;
+            animation: toastGlowGolden 0.5s ease !important;
+            z-index: 100000 !important;
+        }
+        
+        @keyframes toastGlowGolden {
+            0% { opacity: 0; transform: translateX(-50%) scale(0.8); }
+            50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+        
+        /* কাস্টম গোল্ডেন মডাল */
+        .golden-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeInGolden 0.2s ease;
+        }
+        
+        .golden-modal {
+            background: linear-gradient(135deg, #1a1a2e, #0f0f1a);
+            border-radius: 28px;
+            max-width: 340px;
+            width: 85%;
+            padding: 25px 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 215, 0, 0.5);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.2);
+            animation: modalPopGolden 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+        }
+        
+        .golden-modal-icon {
+            width: 65px;
+            height: 65px;
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        
+        .golden-modal-icon i {
+            font-size: 32px;
+            color: #1a1a2e;
+        }
+        
+        .golden-modal h3 {
+            color: #FFD700;
+            font-size: 22px;
+            margin-bottom: 12px;
+            font-weight: 700;
+        }
+        
+        .golden-modal p {
+            color: #ccc;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 22px;
+        }
+        
+        .golden-modal-input {
+            width: 100%;
+            padding: 12px 15px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            border-radius: 12px;
+            color: #FFD700;
+            font-size: 14px;
+            text-align: center;
+            margin-bottom: 20px;
+            outline: none;
+        }
+        
+        .golden-modal-input:focus {
+            border-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
+        }
+        
+        .golden-modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+        
+        .golden-btn {
+            flex: 1;
+            padding: 12px 20px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .golden-btn-primary {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #1a1a2e;
+        }
+        
+        .golden-btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #ccc;
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+        
+        .golden-btn-primary:hover, .golden-btn-secondary:hover {
+            transform: scale(1.02);
+        }
+        
+        .golden-btn-primary:active, .golden-btn-secondary:active {
+            transform: scale(0.98);
+        }
+        
+        @keyframes fadeInGolden {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes modalPopGolden {
+            from { opacity: 0; transform: scale(0.85); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        
+        .admin-success-message {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 165, 0, 0.1));
+            border-left: 4px solid #FFD700;
+            padding: 12px 18px;
+            border-radius: 12px;
+            margin: 10px 0;
+            color: #FFD700;
+            font-weight: 500;
+            animation: slideInRight 0.3s ease;
+        }
+        
+        @keyframes slideInRight {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .notification-item-modern {
+            border-left: 4px solid #FFD700 !important;
+        }
+    `;
+    document.head.appendChild(goldenStyle);
+    
+    // ========================================
+    // ২. গোল্ডেন থিমের alert() ওভাররাইড
+    // ========================================
+    window.originalAlert = window.alert;
+    window.alert = function(message) {
+        const modalHtml = `
+            <div class="golden-modal-overlay" id="goldenAlertModal">
+                <div class="golden-modal">
+                    <div class="golden-modal-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <h3>Notice</h3>
+                    <p>${escapeHtml(message)}</p>
+                    <button class="golden-btn golden-btn-primary" onclick="document.getElementById('goldenAlertModal').remove()">
+                        <i class="fas fa-check"></i> OK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    };
+    
+    // ========================================
+    // ৩. গোল্ডেন থিমের confirm() ওভাররাইড
+    // ========================================
+    window.originalConfirm = window.confirm;
+    window.confirm = function(message) {
+        return new Promise((resolve) => {
+            const modalId = 'goldenConfirmModal_' + Date.now();
+            const modalHtml = `
+                <div class="golden-modal-overlay" id="${modalId}">
+                    <div class="golden-modal">
+                        <div class="golden-modal-icon">
+                            <i class="fas fa-question-circle"></i>
+                        </div>
+                        <h3 style="color: #FFD700;">Confirm</h3>
+                        <p>${escapeHtml(message)}</p>
+                        <div class="golden-modal-buttons">
+                            <button class="golden-btn golden-btn-secondary" onclick="window._confirmResult_${modalId}(false)">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            <button class="golden-btn golden-btn-primary" onclick="window._confirmResult_${modalId}(true)">
+                                <i class="fas fa-check"></i> OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            window[`_confirmResult_${modalId}`] = function(result) {
+                document.getElementById(modalId).remove();
+                delete window[`_confirmResult_${modalId}`];
+                resolve(result);
+            };
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        });
+    };
+    
+    // ========================================
+    // ৪. গোল্ডেন থিমের prompt() ওভাররাইড
+    // ========================================
+    window.originalPrompt = window.prompt;
+    window.prompt = function(message, defaultValue = '') {
+        return new Promise((resolve) => {
+            const modalId = 'goldenPromptModal_' + Date.now();
+            const modalHtml = `
+                <div class="golden-modal-overlay" id="${modalId}">
+                    <div class="golden-modal">
+                        <div class="golden-modal-icon">
+                            <i class="fas fa-edit"></i>
+                        </div>
+                        <h3 style="color: #FFD700;">Input Required</h3>
+                        <p>${escapeHtml(message)}</p>
+                        <input type="text" class="golden-modal-input" id="goldenPromptInput_${modalId}" value="${escapeHtml(defaultValue)}" placeholder="Type here...">
+                        <div class="golden-modal-buttons">
+                            <button class="golden-btn golden-btn-secondary" onclick="window._promptResult_${modalId}(null)">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            <button class="golden-btn golden-btn-primary" onclick="window._promptResult_${modalId}(document.getElementById('goldenPromptInput_${modalId}').value)">
+                                <i class="fas fa-check"></i> OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            window[`_promptResult_${modalId}`] = function(result) {
+                document.getElementById(modalId).remove();
+                delete window[`_promptResult_${modalId}`];
+                resolve(result);
+            };
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            setTimeout(() => {
+                const input = document.getElementById(`goldenPromptInput_${modalId}`);
+                if (input) input.focus();
+            }, 100);
+        });
+    };
+    
+    // ========================================
+    // ৫. আপডেটেড showToast
+    // ========================================
+    const oldToast = window.showToast;
+    window.showToast = function(msg, duration = 2500) {
+        const toast = document.getElementById('toastMessage');
+        if (!toast) return;
+        toast.innerText = msg;
+        toast.style.display = 'block';
+        toast.style.animation = 'none';
+        toast.offsetHeight;
+        toast.style.animation = 'toastGlowGolden 0.5s ease';
+        if (window.toastTimeout) clearTimeout(window.toastTimeout);
+        window.toastTimeout = setTimeout(() => {
+            toast.style.display = 'none';
+        }, duration);
+    };
+    
+    // ========================================
+    // ৬. আপডেটেড showAdminMessage
+    // ========================================
+    const oldAdminMsg = window.showAdminMessage;
+    window.showAdminMessage = function(msg) {
+        const area = document.getElementById('adminMessageArea');
+        if (!area) return;
+        area.innerHTML = `<div class="admin-success-message"><i class="fas fa-crown" style="color: #FFD700; margin-right: 8px;"></i> ${msg}</div>`;
+        if (window.adminMsgTimeout) clearTimeout(window.adminMsgTimeout);
+        window.adminMsgTimeout = setTimeout(() => area.innerHTML = '', 3000);
+    };
+    
+    // ========================================
+    // ৭. হেল্পার ফাংশন
+    // ========================================
+    window.showGoldenToast = window.showToast;
+    window.showGoldenConfirm = window.confirm;
+    window.showGoldenPrompt = window.prompt;
+    
+    console.log("✅ গোল্ডেন থিম সফলভাবে এক্টিভেট হয়েছে!");
+    console.log("⚠️ এখন সব alert, confirm, prompt গোল্ডেন থিমে দেখাবে!");
+})();
+
+// ========================================
+// 🔧 অ্যাডমিন প্যানেল ফিক্স - গোল্ডেন থিম সহ
+// ========================================
+
+(function() {
+    console.log("🔧 অ্যাডমিন প্যানেল ফিক্স এক্টিভেট হচ্ছে...");
+    
+    // অ্যাডমিন পাসওয়ার্ড ফাংশন ওভাররাইড
+    const originalOpenAdminPanel = window.openAdminPanel;
+    
+    window.openAdminPanel = function() {
+        // গোল্ডেন থিমের prompt ব্যবহার করুন
+        showGoldenPromptForAdmin("Enter Admin Password", "Password").then(password => {
+            if (password && password === ADMIN_PASS) {
+                // পাসওয়ার্ড সঠিক হলে অরিজিনাল ফাংশন কল করুন
+                if (originalOpenAdminPanel) {
+                    // পাসওয়ার্ড চেক বাইপাস করে সরাসরি কন্টেন্ট দেখান
+                    showAdminPanelContent();
+                }
+            } else if (password !== null) {
+                showGoldenAlert("❌ Wrong Password!", "Access Denied");
+            }
+        });
+    };
+    
+    // সরাসরি অ্যাডমিন প্যানেল কন্টেন্ট দেখানোর ফাংশন
+    async function showAdminPanelContent() {
+        closeMenu();
+        showLoader("Loading admin panel...");
+        
+        try {
+            const videosSnapshot = await db.collection('videos').get();
+            const users = await getAllUsersFromBoth();
+            const totalVideos = videosSnapshot.size;
+            
+            hideLoader();
+            
+            let html = `
+                <div class="page-container" style="padding: 20px 20px 100px 20px;">
+                    <h2 style="margin-bottom:20px; font-size:28px; background: linear-gradient(135deg, #FFD700, #FFA500); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">👑 Admin Panel</h2>
+                    
+                    <div style="background: #2c3e50; padding: 20px; border-radius: 20px; margin-bottom: 25px;">
+                        <button onclick="window.openAdminPanel()" style="background: #3498db; color: white; border: none; padding: 12px 25px; border-radius: 12px; cursor: pointer; margin-right: 10px;">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        <button onclick="syncAllUsersToFirebase()" style="background: #2ecc71; color: white; border: none; padding: 12px 25px; border-radius: 12px; cursor: pointer;">
+                            <i class="fas fa-cloud-upload-alt"></i> Sync All Users
+                        </button>
+                    </div>
+                    
+                    <div style="background: var(--secondary-bg); padding: 15px; border-radius: 15px; margin-bottom: 20px;">
+                        <h3 style="margin: 0 0 10px 0; color: #FFD700;">📊 Statistics</h3>
+                        <p><i class="fas fa-users"></i> Total Users: <strong>${users.length}</strong></p>
+                        <p><i class="fas fa-video"></i> Total Videos: <strong>${totalVideos}</strong></p>
+                    </div>
+                    
+                    <div style="margin: 15px 0 25px 0;">
+                        <button onclick="showVideoManager()" 
+                            style="width: 100%; background: linear-gradient(135deg, #667eea, #764ba2); 
+                            color: white; border: none; padding: 18px; border-radius: 15px; 
+                            font-weight: bold; font-size: 18px; cursor: pointer;">
+                            <i class="fas fa-video"></i> 🎬 MANAGE VIDEOS (${totalVideos})
+                        </button>
+                    </div>
+                    
+                    ${renderAdminTestingTools(users)}
+                </div>
+            `;
+            
+            contentDiv.innerHTML = html;
+            
+            setTimeout(() => {
+                if (typeof addDeleteButtonToAdminPanel === 'function') addDeleteButtonToAdminPanel();
+                if (typeof addResetButtonToAdminPanel === 'function') addResetButtonToAdminPanel();
+                if (typeof pikkoAddSyncButton === 'function') pikkoAddSyncButton();
+                if (typeof addVipAdminCouponGenerator === 'function') addVipAdminCouponGenerator();
+                if (typeof addFollowResetButtonToAdmin === 'function') addFollowResetButtonToAdmin();
+            }, 100);
+            
+        } catch(error) {
+            hideLoader();
+            console.error("Admin Panel Error:", error);
+            showGoldenAlert("Failed to load admin panel: " + error.message, "Error");
+        }
+    }
+    
+    // গোল্ডেন থিমের প্রম্পট (অ্যাডমিন প্যানেলের জন্য)
+    function showGoldenPromptForAdmin(message, placeholder) {
+        return new Promise((resolve) => {
+            const modalId = 'adminPromptModal_' + Date.now();
+            const modalHtml = `
+                <div class="golden-modal-overlay" id="${modalId}">
+                    <div class="golden-modal">
+                        <div class="golden-modal-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h3 style="color: #FFD700;">Admin Access</h3>
+                        <p>${escapeHtml(message)}</p>
+                        <input type="password" class="golden-modal-input" id="adminPromptInput_${modalId}" placeholder="${escapeHtml(placeholder)}" autofocus>
+                        <div class="golden-modal-buttons">
+                            <button class="golden-btn golden-btn-secondary" onclick="window._adminPromptResult_${modalId}(null)">
+                                <i class="fas fa-times"></i> Cancel
+                            </button>
+                            <button class="golden-btn golden-btn-primary" onclick="window._adminPromptResult_${modalId}(document.getElementById('adminPromptInput_${modalId}').value)">
+                                <i class="fas fa-check"></i> OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            window[`_adminPromptResult_${modalId}`] = function(result) {
+                const modal = document.getElementById(modalId);
+                if (modal) modal.remove();
+                delete window[`_adminPromptResult_${modalId}`];
+                resolve(result);
+            };
+            
+            // আগের মডাল থাকলে রিমুভ
+            const existingModals = document.querySelectorAll('.golden-modal-overlay');
+            existingModals.forEach(modal => modal.remove());
+            
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            setTimeout(() => {
+                const input = document.getElementById(`adminPromptInput_${modalId}`);
+                if (input) input.focus();
+            }, 100);
+        });
+    }
+    
+    // গোল্ডেন থিমের অ্যালার্ট
+    function showGoldenAlert(message, title = "Notice") {
+        const existingAlert = document.querySelector('.golden-modal-overlay:not(#adminPromptModal)');
+        if (existingAlert) existingAlert.remove();
+        
+        const alertHtml = `
+            <div class="golden-modal-overlay" id="goldenAlertModal">
+                <div class="golden-modal">
+                    <div class="golden-modal-icon">
+                        <i class="fas fa-star"></i>
+                    </div>
+                    <h3>${escapeHtml(title)}</h3>
+                    <p>${escapeHtml(message)}</p>
+                    <button class="golden-btn golden-btn-primary" onclick="this.closest('.golden-modal-overlay').remove()">
+                        <i class="fas fa-check"></i> OK
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+    }
+    
+    window.showGoldenAlert = showGoldenAlert;
+    
+    console.log("✅ অ্যাডমিন প্যানেল ফিক্স সম্পন্ন!");
+    console.log("🔑 অ্যাডমিন পাসওয়ার্ড: 0863");
 })();

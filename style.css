@@ -2148,3 +2148,724 @@ body {
     box-shadow: 0 2px 5px rgba(0,0,0,0.5) !important;
     pointer-events: none;
 }
+
+/* ========================================
+   🎖️ ভিআইপি সিস্টেমের জন্য আধুনিক স্টাইল
+   ======================================== */
+
+/* ভিআইপি মডাল - আধুনিক ডিজাইন */
+.vip-modal-container-modern {
+    background: var(--secondary-bg);
+    border-radius: 35px 35px 0 0;
+    width: 100%;
+    max-width: 500px;
+    margin: 0 auto;
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: slideUp 0.3s ease;
+}
+
+.vip-modal-header-modern {
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    padding: 30px 20px;
+    text-align: center;
+    position: relative;
+    border-radius: 35px 35px 0 0;
+    border-bottom: 3px solid #f1c40f;
+}
+
+.vip-header-icon {
+    width: 70px;
+    height: 70px;
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    box-shadow: 0 10px 30px rgba(241, 196, 15, 0.4);
+}
+
+.vip-header-icon i {
+    font-size: 35px;
+    color: #000;
+}
+
+.vip-modal-header-modern h2 {
+    font-size: 26px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.vip-modal-header-modern p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+}
+
+.vip-close-modern {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    font-size: 22px;
+    color: white;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: all 0.3s;
+}
+
+.vip-close-modern:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* ভিআইপি ইউজার স্ট্যাটাস */
+.vip-user-status-modern {
+    padding: 20px;
+}
+
+.vip-active-card {
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    border-radius: 20px;
+    padding: 18px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    animation: vipGlow 2s infinite;
+}
+
+.vip-active-card.vip-1 { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.vip-active-card.vip-2 { background: linear-gradient(135deg, #3498db, #2980b9); }
+.vip-active-card.vip-3 { background: linear-gradient(135deg, #e67e22, #d35400); }
+.vip-active-card.vip-4 { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.vip-active-card.vip-5 { background: linear-gradient(135deg, #f1c40f, #f39c12); }
+
+.vip-active-card > i {
+    font-size: 40px;
+    color: rgba(255,255,255,0.3);
+}
+
+.vip-active-info {
+    flex: 1;
+}
+
+.vip-active-name {
+    display: block;
+    font-weight: bold;
+    font-size: 18px;
+    color: white;
+}
+
+.vip-active-expiry {
+    display: block;
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+}
+
+.vip-daily-claim-modern {
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 10px 18px;
+    border-radius: 30px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vip-daily-claim-modern:hover {
+    background: rgba(255,255,255,0.3);
+    transform: scale(1.02);
+}
+
+.vip-inactive-card {
+    background: var(--input-bg);
+    border-radius: 20px;
+    padding: 25px;
+    text-align: center;
+    border: 1px dashed var(--border);
+}
+
+.vip-inactive-card i {
+    font-size: 40px;
+    color: var(--muted-text);
+    margin-bottom: 10px;
+}
+
+.vip-inactive-card span {
+    display: block;
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.vip-inactive-card small {
+    font-size: 12px;
+    color: var(--muted-text);
+}
+
+/* ভিআইপি প্ল্যান গ্রিড */
+.vip-plans-grid-modern {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.vip-plan-card-modern {
+    background: var(--input-bg);
+    border-radius: 20px;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s;
+    border: 1px solid var(--border);
+}
+
+.vip-plan-card-modern:hover {
+    transform: translateY(-3px);
+    border-color: #f1c40f;
+    box-shadow: 0 10px 25px rgba(241, 196, 15, 0.2);
+}
+
+.vip-plan-bg {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 120px;
+    height: 120px;
+    border-radius: 0 0 0 100%;
+    opacity: 0.15;
+}
+
+.vip-plan-badge {
+    display: inline-block;
+    background: #f1c40f;
+    color: #000;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    margin: 15px 0 0 15px;
+}
+
+.vip-plan-price {
+    font-size: 32px;
+    font-weight: 800;
+    margin: 10px 15px 0;
+    color: var(--text);
+}
+
+.vip-plan-price::before {
+    content: '₹';
+    font-size: 18px;
+    margin-right: 2px;
+}
+
+.vip-plan-duration {
+    font-size: 12px;
+    color: var(--muted-text);
+    margin: 0 15px 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.vip-plan-features {
+    padding: 0 15px;
+}
+
+.vip-feature {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.vip-feature i {
+    width: 25px;
+    font-size: 16px;
+    color: #f1c40f;
+}
+
+.vip-feature span {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.vip-feature small {
+    font-size: 10px;
+    color: var(--muted-text);
+}
+
+.vip-buy-modern {
+    width: calc(100% - 30px);
+    margin: 15px;
+    padding: 14px;
+    background: linear-gradient(135deg, #f1c40f, #e67e22);
+    border: none;
+    border-radius: 30px;
+    font-weight: bold;
+    font-size: 16px;
+    color: #000;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.vip-buy-modern:hover {
+    transform: scale(1.02);
+    box-shadow: 0 5px 20px rgba(241, 196, 15, 0.4);
+}
+
+/* পেমেন্ট সেকশন */
+.vip-payment-section-modern {
+    padding: 20px;
+    background: var(--input-bg);
+    margin: 15px;
+    border-radius: 20px;
+}
+
+.vip-upi-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    background: rgba(241, 196, 15, 0.1);
+    border-radius: 15px;
+    margin-bottom: 15px;
+}
+
+.vip-upi-info i {
+    font-size: 24px;
+    color: #f1c40f;
+}
+
+.vip-upi-info strong {
+    font-size: 12px;
+    color: var(--muted-text);
+}
+
+.upi-id-copy {
+    font-size: 16px;
+    font-weight: bold;
+    color: #f1c40f;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(241, 196, 15, 0.2);
+    padding: 5px 10px;
+    border-radius: 20px;
+}
+
+.upi-id-copy:hover {
+    background: rgba(241, 196, 15, 0.3);
+}
+
+.vip-coupon-input {
+    display: flex;
+    gap: 10px;
+}
+
+.vip-coupon-field {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 12px 15px;
+    border-radius: 30px;
+    color: var(--text);
+    font-size: 14px;
+    text-align: center;
+    letter-spacing: 2px;
+    font-weight: bold;
+}
+
+.vip-coupon-field:focus {
+    outline: none;
+    border-color: #f1c40f;
+}
+
+.vip-coupon-btn {
+    background: linear-gradient(135deg, #2ecc71, #27ae60);
+    border: none;
+    padding: 12px 20px;
+    border-radius: 30px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.vip-coupon-btn:hover {
+    transform: scale(1.02);
+}
+
+/* প্রোফাইলে ভিআইপি বাটন (বড় ও প্রফেশনাল) */
+.vip-profile-btn-modern {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease !important;
+}
+
+.vip-profile-btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
+
+.vip-profile-btn-modern:hover::before {
+    left: 100%;
+}
+
+.vip-profile-btn-modern:hover {
+    transform: scale(1.02) !important;
+}
+
+.vip-active-btn {
+    animation: vipProfilePulse 2s infinite;
+}
+
+@keyframes vipProfilePulse {
+    0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); }
+}
+
+/* অ্যাডমিন প্যানেলের ভিআইপি জেনারেটর স্টাইল */
+.vip-admin-select, .vip-admin-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 10px;
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+}
+
+.vip-admin-select:focus, .vip-admin-input:focus {
+    border-color: #f1c40f;
+}
+
+/* রেস্পন্সিভ */
+@media (max-width: 480px) {
+    .vip-plan-price {
+        font-size: 28px;
+    }
+    
+    .vip-feature span {
+        font-size: 12px;
+    }
+    
+    .vip-active-card {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .vip-coupon-input {
+        flex-direction: column;
+    }
+    
+    .vip-profile-btn-modern {
+        font-size: 14px !important;
+        padding: 12px 15px !important;
+    }
+}
+
+@keyframes vipGlow {
+    0% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(241, 196, 15, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(241, 196, 15, 0); }
+}
+/* ========================================
+   👥 FOLLOW/FOLOWERS SYSTEM STYLES
+   ======================================== */
+
+/* স্ট্যাটাস বক্স ক্লিকযোগ্য করার জন্য */
+.stat-box {
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-box:hover {
+    transform: translateY(-2px);
+    background: rgba(0, 0, 0, 0.4) !important;
+}
+
+.stat-box:active {
+    transform: translateY(0);
+}
+
+/* ক্লিক ইফেক্ট */
+.stat-box::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s;
+}
+
+.stat-box:active::after {
+    width: 100%;
+    height: 100%;
+}
+
+/* ফলো বাটন এনিমেশন */
+.follow-btn, .follow-small-btn {
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.follow-btn:active, .follow-small-btn:active {
+    transform: scale(0.95);
+}
+
+/* ফলো বাটন হোভার ইফেক্ট */
+.follow-btn:not(.following):hover, 
+.follow-small-btn:not(.following):hover {
+    background: var(--primary);
+    opacity: 0.9;
+    transform: scale(1.02);
+}
+
+.follow-btn.following:hover,
+.follow-small-btn.following:hover {
+    background: rgba(254, 44, 85, 0.1) !important;
+    border-color: #ff4444 !important;
+    color: #ff4444 !important;
+}
+
+/* ফলোয়ার লিস্ট মডাল */
+#followListModal .bottom-modal {
+    max-height: 80vh;
+    border-radius: 25px 25px 0 0;
+}
+
+#followListModal .user-card {
+    transition: all 0.2s ease;
+}
+
+#followListModal .user-card:hover {
+    transform: translateX(5px);
+    border-color: var(--primary);
+}
+
+/* লোডিং ইফেক্ট */
+.follow-btn:disabled,
+.follow-small-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+/* রেস্পন্সিভ */
+@media (max-width: 480px) {
+    .stat-box {
+        min-width: 60px;
+        padding: 6px 8px;
+    }
+    
+    .stat-num {
+        font-size: 14px;
+    }
+    
+    .stat-label {
+        font-size: 9px;
+    }
+}
+/* ========================================
+   👥 PROFILE STATS STYLES (FOLLOWERS/FOLLOWING)
+   ======================================== */
+
+.profile-stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 30px;
+    margin: 20px 0 15px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.profile-stat-box {
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 5px 15px;
+    border-radius: 12px;
+}
+
+.profile-stat-box:hover {
+    background: rgba(255,255,255,0.1);
+    transform: translateY(-2px);
+}
+
+.profile-stat-box:active {
+    transform: translateY(0);
+}
+
+.profile-stat-number {
+    display: block;
+    font-size: 20px;
+    font-weight: bold;
+    color: white;
+}
+
+.profile-stat-label {
+    display: block;
+    font-size: 12px;
+    opacity: 0.8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* পোস্ট গ্রিড */
+.posts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+}
+
+.posts-grid-item {
+    aspect-ratio: 9/16;
+    background: #000;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.posts-grid-item:hover {
+    transform: scale(1.02);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.posts-grid-item video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* রেস্পন্সিভ */
+@media (max-width: 480px) {
+    .profile-stats-row {
+        gap: 15px;
+    }
+    
+    .profile-stat-box {
+        padding: 5px 10px;
+    }
+    
+    .profile-stat-number {
+        font-size: 16px;
+    }
+    
+    .profile-stat-label {
+        font-size: 10px;
+    }
+}
+/* ========================================
+   USER POSTS MANAGER STYLES
+   ======================================== */
+
+.user-post-card {
+    transition: all 0.3s ease;
+}
+
+.user-post-card:hover {
+    transform: translateX(5px);
+    border-color: var(--primary) !important;
+}
+
+#userPostsSearch:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+/* রেস্পন্সিভ */
+@media (max-width: 480px) {
+    .user-post-card > div {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .user-post-card > div > div:first-child {
+        width: 150px;
+        height: 267px;
+    }
+    
+    .user-post-card .fa-heart, 
+    .user-post-card .fa-comment {
+        font-size: 14px;
+    }
+}
+/* ========================================
+   POSTS MANAGER STYLES
+   ======================================== */
+
+.post-item-card {
+    transition: all 0.2s ease;
+}
+
+.post-item-card:hover {
+    transform: translateX(5px);
+    border-color: var(--primary) !important;
+}
+
+#postsSearchInput:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(254, 44, 85, 0.2);
+}
+
+/* পোস্ট মডাল স্ক্রোলবার */
+#postsListContainer::-webkit-scrollbar {
+    width: 4px;
+}
+
+#postsListContainer::-webkit-scrollbar-track {
+    background: var(--input-bg);
+    border-radius: 10px;
+}
+
+#postsListContainer::-webkit-scrollbar-thumb {
+    background: var(--primary);
+    border-radius: 10px;
+}
+
+/* রেস্পন্সিভ */
+@media (max-width: 480px) {
+    .post-item-card > div {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    
+    .post-item-card > div > div:first-child {
+        width: 120px;
+        height: 213px;
+        margin-bottom: 10px;
+    }
+    
+    .post-item-card .fa-heart, 
+    .post-item-card .fa-comment {
+        font-size: 12px;
+    }
+}
