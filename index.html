@@ -337,6 +337,96 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
     
+    <!-- Firebase Messaging SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
+
+<script>
+// FCM Push Notification সিস্টেম
+(function initPushNotifications() {
+    // ফায়ারবেস ইতিমধ্যে initialized আছে app.js-এ
+    
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then((registration) => {
+                console.log('Service Worker registered:', registration);
+                
+                // Firebase Messaging instance
+                const messaging = firebase.messaging();
+                
+                // VAPID key (আপনার Web Push Certificate থেকে)
+                const vapidKey = 'hIOJq7AvUSVaHQ9pUK4WPH4WKfL_4iOj9a3RJO-G9C8wFPtgEmOyYD797NKmeeu1hwQvlhftCw3ziq9gjL7A8M8KbTJwdPswohknuw4ciLU';
+                
+                // পারমিশন চাওয়া
+                async function requestNotificationPermission() {
+                    try {
+                        const permission = await Notification.requestPermission();
+                        if (permission === 'granted') {
+                            console.log('Notification permission granted');
+                            
+                            // টোকেন জেনারেট করুন
+                            const token = await messaging.getToken({
+                                vapidKey: vapidKey,
+                                serviceWorkerRegistration: registration
+                            });
+                            
+                            console.log('FCM Token:', token);
+                            
+                            // টোকেন ফায়ারবেসে সেভ করুন
+                            const user = getActiveUser();
+                            if (user && user.username) {
+                                await db.collection('users').doc(user.username).update({
+                                    fcmToken: token,
+                                    fcmTokenUpdated: firebase.firestore.FieldValue.serverTimestamp()
+                                }).catch(e => console.log('Token save error:', e));
+                            }
+                            
+                            localStorage.setItem('fcmToken', token);
+                        } else {
+                            console.log('Notification permission denied');
+                        }
+                    } catch (error) {
+                        console.error('Error getting notification permission:', error);
+                    }
+                }
+                
+                // ফোরগ্রাউন্ড নোটিফিকেশন হ্যান্ডলার
+                messaging.onMessage((payload) => {
+                    console.log('Foreground message:', payload);
+                    if (payload.notification) {
+                        showToast(payload.notification.body, 4000);
+                    }
+                });
+                
+                // লগইন বা রিলোডে টোকেন আপডেট
+                if (Notification.permission === 'granted') {
+                    requestNotificationPermission();
+                } else if (Notification.permission !== 'denied') {
+                    // ইউজার অ্যাক্টিভ হলে ৫ সেকেন্ড পর চাইব
+                    setTimeout(() => {
+                        const user = getActiveUser();
+                        if (user) {
+                            requestNotificationPermission();
+                        }
+                    }, 5000);
+                }
+                
+                // টোকেন রিফ্রেশ লিসেনার
+                messaging.onTokenRefresh(async () => {
+                    const newToken = await messaging.getToken({ vapidKey: vapidKey });
+                    console.log('Token refreshed:', newToken);
+                    const user = getActiveUser();
+                    if (user) {
+                        await db.collection('users').doc(user.username).update({ fcmToken: newToken });
+                    }
+                });
+                
+            .catch(err => console.log('Service Worker registration failed:', err));
+    } else {
+        console.log('Service Worker not supported');
+    }
+})();
+</script>
+    
     <!-- Main App JS -->
     <script src="app.js"></script>
     

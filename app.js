@@ -1,13 +1,14 @@
 // ========================================
-// PIKKO SHORTS - PART 1: FIREBASE & GLOBALS
+// PIKKO SHORTS - FIREBASE & GLOBALS
 // ========================================
-// app.js-এর শুরুতে যোগ করুন
+
 if (!document.querySelector('meta[name="viewport"]')) {
     const meta = document.createElement('meta');
     meta.name = 'viewport';
     meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
     document.head.appendChild(meta);
 }
+
 const firebaseConfig = {
     apiKey: "AIzaSyBU7zL9e_q1dDSsVMHNw7iJNuunzhzSH0k",
     authDomain: "pikko-shorts-99a1b.firebaseapp.com",
@@ -17,6 +18,9 @@ const firebaseConfig = {
     messagingSenderId: "999981600608",
     appId: "1:999981600608:web:ae22fb1735ea7a37375805"
 };
+
+// Push Notification Server URL (শুধু একবার!)
+const PUSH_SERVER_URL = 'https://pikko-push-server-production.up.railway.app';
 
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
@@ -9547,3 +9551,112 @@ setInterval(() => {
         initAllVideoProgressBars();
     }
 }, 2000);
+
+// ========================================
+// 🔥 FCM PUSH NOTIFICATION SYSTEM (FINAL)
+// ========================================
+
+async function sendPushNotification(username, title, body, type = 'general', additionalData = {}) {
+    if (!username) return;
+    
+    try {
+        const userDoc = await db.collection('users').doc(username).get();
+        const token = userDoc.data()?.fcmToken;
+        
+        if (!token) {
+            console.log(`⚠️ No FCM token for ${username}`);
+            return;
+        }
+        
+        const response = await fetch(`${PUSH_SERVER_URL}/send-notification`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                token: token,
+                title: title,
+                body: body,
+                type: type,
+                username: username,
+                videoId: additionalData.videoId || '',
+                amount: additionalData.amount || ''
+            })
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            console.log(`✅ Push sent to ${username}: ${title}`);
+        }
+    } catch (error) {
+        console.error('❌ Push error:', error);
+    }
+}
+
+// লাইক
+if (window.toggleLike) {
+    const origLike = window.toggleLike;
+    window.toggleLike = async function(id, btn) {
+        await origLike(id, btn);
+        const video = allVideos.find(v => v && v.id === id);
+        const user = getActiveUser();
+        if (video && video.username !== user?.username && video.username) {
+            sendPushNotification(video.username, '❤️ New Like', `${user?.username || 'Someone'} liked your video!`, 'like', { username: user?.username, videoId: id });
+        }
+    };
+}
+
+// কমেন্ট
+if (window.postComment) {
+    const origComment = window.postComment;
+    window.postComment = async function() {
+        await origComment();
+        const user = getActiveUser();
+        const video = allVideos.find(v => v && v.id === currentVideoId);
+        if (video && video.username !== user?.username && video.username) {
+            const commentText = document.getElementById('commentInput')?.value || '';
+            sendPushNotification(video.username, '💬 New Comment', `${user?.username}: ${commentText.substring(0, 50)}...`, 'comment', { username: user?.username, videoId: currentVideoId });
+        }
+    };
+}
+
+// গিফট
+if (window.sendGift) {
+    const origGift = window.sendGift;
+    window.sendGift = async function() {
+        const user = getActiveUser();
+        const creator = currentGiftVideoCreator;
+        await origGift();
+        if (creator && creator !== user?.username) {
+            sendPushNotification(creator, '🎁 Gift Received!', `${user?.username} sent you ${selectedStars} stars!`, 'gift', { username: user?.username, amount: selectedStars });
+        }
+    };
+}
+
+// ফলো
+if (window.handleFollow) {
+    const origFollow = window.handleFollow;
+    window.handleFollow = async function(targetUsername, btn) {
+        const user = getActiveUser();
+        const wasFollowing = btn?.classList?.contains('following');
+        await origFollow(targetUsername, btn);
+        if (!wasFollowing && user && targetUsername !== user.username) {
+            sendPushNotification(targetUsername, '👥 New Follower', `${user.username} started following you!`, 'follow', { username: user.username });
+        }
+    };
+}
+
+// চ্যাট
+if (window.sendMessage) {
+    const origMsg = window.sendMessage;
+    window.sendMessage = async function() {
+        const input = document.getElementById('chatInput');
+        const text = input?.value.trim();
+        const user = getActiveUser();
+        const receiver = currentChatUser;
+        await origMsg();
+        if (text && receiver && receiver !== user?.username) {
+            sendPushNotification(receiver, '💬 New Message', `${user?.username}: ${text.substring(0, 50)}...`, 'message', { username: user?.username, message: text });
+        }
+    };
+}
+
+console.log("FCM Push Notification System Loaded");
