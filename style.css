@@ -2869,3 +2869,273 @@ body {
         font-size: 12px;
     }
 }
+/* ========================================
+   PROGRESS BAR FIX - UPAR ANAR JONNO
+   ======================================== */
+
+/* প্রগ্রেস বার কন্টেইনার - উপরে সরানো হয়েছে */
+.video-progress-container {
+    position: absolute;
+    bottom: 50px !important;  /* ← এটা পরিবর্তন করে উপরে/নিচে করুন */
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    z-index: 45;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* টাইম ডিসপ্লে - প্রগ্রেস বারের ঠিক উপরে */
+.video-time-display {
+    position: absolute;
+    bottom: 58px !important;  /* প্রগ্রেস বার থেকে 8px উপরে */
+    right: 12px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    color: white;
+    font-family: monospace;
+    z-index: 46;
+    pointer-events: none;
+    backdrop-filter: blur(4px);
+    font-weight: 500;
+}
+
+/* ক্যাপশন ওভারলে - নিচে থাকবে */
+.video-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px 15px 100px 15px;  /* bottom padding বাড়ানো হয়েছে */
+    background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.6) 50%, transparent 100%);
+    z-index: 15;
+    pointer-events: none;
+}
+
+/* ক্যাপশন টেক্সট */
+.video-overlay .caption {
+    font-size: 14px;
+    color: white;
+    line-height: 1.4;
+    max-width: 85%;
+    margin-top: 5px;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    pointer-events: auto;
+}
+
+/* ইউজার ইনফো (username + follow button) */
+.video-overlay .user-info-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+    pointer-events: auto;
+}
+
+/* রাইট সাইডবার - একটু উপরে সরানো */
+.right-sidebar {
+    position: absolute;
+    right: 12px;
+    bottom: 120px;  /* আগে 100px ছিল, এখন 120px */
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    align-items: center;
+    z-index: 20;
+    pointer-events: auto;
+}
+
+/* ভিডিও মেনু বাটন */
+.video-menu {
+    position: absolute;
+    top: 60px;
+    right: 12px;
+    z-index: 25;
+    background: rgba(0, 0, 0, 0.55);
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    pointer-events: auto;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* মোবাইল ডিভাইসের জন্য */
+@media (max-width: 480px) {
+    .video-progress-container {
+        bottom: 70px !important;
+    }
+    
+    .video-time-display {
+        bottom: 80px !important;
+        font-size: 10px;
+        padding: 2px 8px;
+    }
+    
+    .video-overlay {
+        padding: 15px 12px 90px 12px;
+    }
+    
+    .right-sidebar {
+        bottom: 105px;
+        gap: 14px;
+    }
+}
+/* ========================================
+   PROFESSIONAL VIDEO OPTIONS MENU
+   ======================================== */
+
+/* ভিডিও অপশন মডাল - প্রফেশনাল ডিজাইন */
+#videoMenuModal .bottom-modal {
+    border-radius: 28px 28px 0 0 !important;
+    background: var(--secondary-bg);
+    overflow: hidden;
+    animation: videoMenuSlideUp 0.25s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+}
+
+@keyframes videoMenuSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* হেডার স্টাইল */
+#videoMenuModal .user-list-header {
+    padding: 20px 20px 16px;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--secondary-bg);
+    position: relative;
+}
+
+#videoMenuModal .user-list-header span {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary), #ff8c00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.5px;
+}
+
+#videoMenuModal .user-list-header i {
+    background: rgba(255,255,255,0.1);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+#videoMenuModal .user-list-header i:hover {
+    background: rgba(254,44,85,0.2);
+    transform: scale(1.05);
+}
+
+/* মেনু আইটেম স্টাইল */
+#videoMenuModal .user-row {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    background: var(--secondary-bg);
+}
+
+#videoMenuModal .user-row:hover {
+    background: var(--input-bg);
+    padding-left: 25px;
+}
+
+#videoMenuModal .user-row i {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+
+/* আইকন ব্যাকগ্রাউন্ড কালার */
+#videoMenuModal .user-row:first-child i {
+    background: rgba(52, 152, 219, 0.15);
+    color: #3498db;
+}
+
+#videoMenuModal .user-row:nth-child(2) i {
+    background: rgba(241, 196, 15, 0.15);
+    color: #f1c40f;
+}
+
+#videoMenuModal .user-row:nth-child(3) i {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
+#videoMenuModal .user-row:nth-child(4) i {
+    background: rgba(155, 89, 182, 0.15);
+    color: #9b59b6;
+}
+
+/* ডিলিট অপশন */
+#videoMenuModal .user-row:last-child i {
+    background: rgba(231, 76, 60, 0.15);
+    color: #e74c3c;
+}
+
+#videoMenuModal .user-row:last-child span {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+/* স্প্যান স্টাইল */
+#videoMenuModal .user-row span {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+}
+
+/* ডিভাইডার ইফেক্ট */
+#videoMenuModal .user-row:active {
+    transform: scale(0.98);
+    background: rgba(254,44,85,0.1);
+}
+
+/* রিপোর্ট অপশন আলাদা রং */
+#videoMenuModal .user-row[onclick*="reportVideo"] span {
+    color: #f39c12;
+}
+
+#videoMenuModal .user-row[onclick*="reportVideo"] i {
+    background: rgba(243, 156, 18, 0.15);
+    color: #f39c12;
+}
+/* শুধু AI বাটন লাল */
+.ai-assistant-button {
+    background: linear-gradient(135deg, #dc2626, #b91c1c) !important;
+}
+
+/* শুধু স্টার হলুদ */
+.fa-star, .fas.fa-star {
+    color: #FFD700 !important;
+}

@@ -669,7 +669,7 @@ function loadMoreVideos() {
         div.setAttribute('data-video-index', start + idx);
         div.setAttribute('data-video-id', vid.id);
         div.setAttribute('data-username', vid.username);
-        div.innerHTML = `<video class="video-player" src="${vid.url}" poster="${thumbnailUrl}" loop playsinline ondblclick="handleDoubleTap(this, '${vid.id}')" onclick="handleVideoClick(event, this)"></video><div class="play-pause-btn"><i class="fas fa-play"></i></div><div class="video-menu" onclick="openVideoOptions('${vid.username}', '${vid.id}', '${vid.url}')"><i class="fas fa-ellipsis-vertical"></i></div><div class="right-sidebar"><div class="avatar-circle" style="${avatarStyle}" onclick="viewOtherProfile('${vid.username}')">${avatarContent}${!isFollowing ? '<div class="plus-badge"><i class="fas fa-plus"></i></div>' : ''}</div><div class="action-btn" onclick="toggleLike('${vid.id}', this)"><i class="fas fa-heart" style="color: ${isLiked ? '#fe2c55' : 'white'}"></i><span class="like-count">${likeCount}</span></div><div class="action-btn" onclick="toggleSave('${vid.id}', this)"><i class="fas fa-bookmark" style="color: ${isSaved ? '#fe2c55' : 'white'}"></i><span>Save</span></div><div class="action-btn" onclick="openComments('${vid.id}')"><i class="fas fa-comment-dots"></i><span>${commentCount}</span></div><div class="action-btn" onclick="openGiftModal('${vid.username}')"><i class="fas fa-gift"></i><span>Gift</span></div><div class="action-btn" onclick="saveOffline('${vid.id}', '${vid.url}', '${vid.caption}', '${vid.username}')"><i class="fas fa-cloud-download-alt"></i><span>Offline</span></div><div class="action-btn" onclick="shareVideo('${vid.id}')"><i class="fas fa-share"></i><span>Share</span></div></div><div class="video-overlay"><div class="user-info-row"><div class="username" onclick="viewOtherProfile('${vid.username}')">${vid.username}</div><button class="follow-btn ${isFollowing ? 'following' : ''}" onclick="handleFollow('${vid.username}', this)">${isFollowing ? 'Following' : 'Follow'}</button></div><div class="caption">${escapeHtml(vid.caption || '')}</div></div>`;
+        div.innerHTML = `<video class="video-player" src="${vid.url}" poster="${thumbnailUrl}" loop playsinline ondblclick="handleDoubleTap(this, '${vid.id}')" onclick="handleVideoClick(event, this)"></video><div class="play-pause-btn"><i class="fas fa-play"></i></div><div class="video-menu" onclick="openVideoOptions('${vid.username}', '${vid.id}', '${vid.url}')"><i class="fas fa-ellipsis-vertical"></i></div><div class="right-sidebar"><div class="avatar-circle" style="${avatarStyle}" onclick="viewOtherProfile('${vid.username}')">${avatarContent}${!isFollowing ? '<div class="plus-badge"><i class="fas fa-plus"></i></div>' : ''}</div><div class="action-btn" onclick="toggleLike('${vid.id}', this)"><i class="fas fa-heart" style="color: ${isLiked ? '#fe2c55' : 'white'}"></i><span class="like-count">${likeCount}</span></div><div class="action-btn" onclick="toggleSave('${vid.id}', this)"><i class="fas fa-bookmark" style="color: ${isSaved ? '#fe2c55' : 'white'}"></i><span>Save</span></div><div class="action-btn" onclick="openComments('${vid.id}')"><i class="fas fa-comment-dots"></i><span>${commentCount}</span></div><div class="action-btn" onclick="openGiftModal('${vid.username}')"><i class="fas fa-star"></i><span>Gift</span></div><div class="action-btn" onclick="saveOffline('${vid.id}', '${vid.url}', '${vid.caption}', '${vid.username}')"><i class="fas fa-cloud-download-alt"></i><span>Offline</span></div><div class="action-btn" onclick="shareVideo('${vid.id}')"><i class="fas fa-share"></i><span>Share</span></div></div><div class="video-overlay"><div class="user-info-row"><div class="username" onclick="viewOtherProfile('${vid.username}')">${vid.username}</div><button class="follow-btn ${isFollowing ? 'following' : ''}" onclick="handleFollow('${vid.username}', this)">${isFollowing ? 'Following' : 'Follow'}</button></div><div class="caption">${escapeHtml(vid.caption || '')}</div></div>`;
         fragment.appendChild(div);
     }); 
     
@@ -9182,3 +9182,368 @@ function makeProfileStatsClickableForPosts() {
     console.log("✅ অ্যাডমিন প্যানেল ফিক্স সম্পন্ন!");
     console.log("🔑 অ্যাডমিন পাসওয়ার্ড: 0863");
 })();
+// ========================================
+// PART 31: VIDEO PROGRESS BAR (TIKTOK STYLE)
+// ========================================
+
+// Add progress bar styles dynamically
+(function addProgressBarStyles() {
+    if (document.getElementById('videoProgressBarStyles')) return;
+    const style = document.createElement('style');
+    style.id = 'videoProgressBarStyles';
+    style.textContent = `
+        /* Video Progress Bar Container */
+        .video-progress-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255, 255, 255, 0.2);
+            z-index: 25;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        
+        /* Progress Bar Fill */
+        .video-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #fe2c55, #ff8c00);
+            border-radius: 0 2px 2px 0;
+            position: relative;
+            transition: width 0.05s linear;
+        }
+        
+        /* Progress knob/handle */
+        .video-progress-knob {
+            position: absolute;
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 10px;
+            height: 10px;
+            background: #fe2c55;
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(254, 44, 85, 0.8);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .video-progress-container:hover .video-progress-knob {
+            opacity: 1;
+        }
+        
+        /* Progress bar on hover */
+        .video-progress-container:hover {
+            height: 5px;
+        }
+        
+        .video-progress-container:hover .video-progress-fill {
+            height: 5px;
+        }
+        
+        /* Duration display (optional) */
+        .video-time-display {
+            position: absolute;
+            bottom: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: white;
+            font-family: monospace;
+            z-index: 26;
+            pointer-events: none;
+            backdrop-filter: blur(4px);
+        }
+        
+        /* Animation for seek effect */
+        @keyframes seekPulse {
+            0% { opacity: 0.7; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.5); }
+        }
+        
+        .seek-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 27;
+            pointer-events: none;
+            animation: seekPulse 0.3s ease-out forwards;
+        }
+    `;
+    document.head.appendChild(style);
+})();
+
+// Add progress bar to a video card
+function addProgressBarToVideo(videoElement) {
+    if (!videoElement) return;
+    const videoCard = videoElement.closest('.video-card');
+    if (!videoCard) return;
+    
+    // Check if progress bar already exists
+    if (videoCard.querySelector('.video-progress-container')) return;
+    
+    // Create progress bar container
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'video-progress-container';
+    
+    const progressFill = document.createElement('div');
+    progressFill.className = 'video-progress-fill';
+    progressContainer.appendChild(progressFill);
+    
+    const progressKnob = document.createElement('div');
+    progressKnob.className = 'video-progress-knob';
+    progressFill.appendChild(progressKnob);
+    
+    // Create time display
+    const timeDisplay = document.createElement('div');
+    timeDisplay.className = 'video-time-display';
+    timeDisplay.textContent = '0:00 / 0:00';
+    
+    videoCard.appendChild(progressContainer);
+    videoCard.appendChild(timeDisplay);
+    
+    // Store references on video element
+    videoElement._progressFill = progressFill;
+    videoElement._progressContainer = progressContainer;
+    videoElement._timeDisplay = timeDisplay;
+    
+    // Update progress function
+    function updateProgress() {
+        if (!videoElement || !videoElement._progressFill) return;
+        if (videoElement.duration && !isNaN(videoElement.duration)) {
+            const percent = (videoElement.currentTime / videoElement.duration) * 100;
+            videoElement._progressFill.style.width = percent + '%';
+            
+            // Update time display
+            const currentMin = Math.floor(videoElement.currentTime / 60);
+            const currentSec = Math.floor(videoElement.currentTime % 60);
+            const totalMin = Math.floor(videoElement.duration / 60);
+            const totalSec = Math.floor(videoElement.duration % 60);
+            videoElement._timeDisplay.textContent = `${currentMin}:${currentSec.toString().padStart(2, '0')} / ${totalMin}:${totalSec.toString().padStart(2, '0')}`;
+        }
+    }
+    
+    // Add seek functionality
+    let isSeeking = false;
+    
+    function handleSeek(e) {
+        const rect = progressContainer.getBoundingClientRect();
+        let clientX;
+        
+        if (e.type === 'mousemove' || e.type === 'click') {
+            clientX = e.clientX;
+        } else if (e.type === 'touchmove' || e.type === 'touchstart') {
+            clientX = e.touches[0].clientX;
+        } else {
+            return;
+        }
+        
+        let clickX = clientX - rect.left;
+        let width = rect.width;
+        let percent = Math.max(0, Math.min(1, clickX / width));
+        let seekTime = percent * videoElement.duration;
+        
+        if (!isNaN(seekTime) && isFinite(seekTime)) {
+            videoElement.currentTime = seekTime;
+            updateProgress();
+            
+            // Show seek indicator
+            const seekIndicator = document.createElement('div');
+            seekIndicator.className = 'seek-indicator';
+            const seekMin = Math.floor(seekTime / 60);
+            const seekSec = Math.floor(seekTime % 60);
+            seekIndicator.textContent = `${seekMin}:${seekSec.toString().padStart(2, '0')}`;
+            videoCard.appendChild(seekIndicator);
+            setTimeout(() => seekIndicator.remove(), 300);
+        }
+    }
+    
+    function startSeek(e) {
+        isSeeking = true;
+        handleSeek(e);
+        
+        function onMove(e) {
+            if (isSeeking) {
+                e.preventDefault();
+                handleSeek(e);
+            }
+        }
+        
+        function onEnd() {
+            isSeeking = false;
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onEnd);
+        }
+        
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onEnd);
+    }
+    
+    progressContainer.addEventListener('click', handleSeek);
+    progressContainer.addEventListener('mousedown', startSeek);
+    progressContainer.addEventListener('touchstart', startSeek, { passive: false });
+    
+    // Update progress during playback
+    let progressInterval = null;
+    
+    function startProgressInterval() {
+        if (progressInterval) clearInterval(progressInterval);
+        progressInterval = setInterval(() => {
+            if (!videoElement.paused && !isSeeking) {
+                updateProgress();
+            }
+        }, 50);
+    }
+    
+    function stopProgressInterval() {
+        if (progressInterval) {
+            clearInterval(progressInterval);
+            progressInterval = null;
+        }
+    }
+    
+    // Listen to video events
+    videoElement.addEventListener('play', () => {
+        startProgressInterval();
+        updateProgress();
+    });
+    
+    videoElement.addEventListener('pause', () => {
+        stopProgressInterval();
+    });
+    
+    videoElement.addEventListener('ended', () => {
+        stopProgressInterval();
+        videoElement._progressFill.style.width = '0%';
+    });
+    
+    videoElement.addEventListener('timeupdate', () => {
+        if (videoElement.paused) {
+            updateProgress();
+        }
+    });
+    
+    videoElement.addEventListener('loadedmetadata', () => {
+        updateProgress();
+    });
+    
+    // Initialize
+    if (!videoElement.paused) {
+        startProgressInterval();
+    }
+    
+    updateProgress();
+}
+
+// Add progress bars to all existing videos
+function initAllVideoProgressBars() {
+    const videos = document.querySelectorAll('.video-player');
+    videos.forEach(video => {
+        if (!video._hasProgressBar) {
+            addProgressBarToVideo(video);
+            video._hasProgressBar = true;
+        }
+    });
+}
+
+// Observe new videos being added (for infinite scroll)
+function observeNewVideosForProgressBar() {
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) {
+                    const videos = node.querySelectorAll ? node.querySelectorAll('.video-player') : 
+                                   (node.classList && node.classList.contains('video-player') ? [node] : []);
+                    videos.forEach(video => {
+                        if (!video._hasProgressBar) {
+                            setTimeout(() => addProgressBarToVideo(video), 100);
+                            video._hasProgressBar = true;
+                        }
+                    });
+                }
+            });
+        });
+    });
+    
+    const feedContainer = document.getElementById('feedContainer');
+    if (feedContainer) {
+        observer.observe(feedContainer, { childList: true, subtree: true });
+    }
+}
+
+// Override loadMoreVideos to add progress bars to new videos
+const originalLoadMoreVideosForProgress = window.loadMoreVideos;
+if (originalLoadMoreVideosForProgress) {
+    window.loadMoreVideos = function() {
+        originalLoadMoreVideosForProgress();
+        setTimeout(() => {
+            initAllVideoProgressBars();
+        }, 300);
+    };
+}
+
+// Override renderHome to initialize progress bars
+const originalRenderHomeForProgress = window.renderHome;
+if (originalRenderHomeForProgress) {
+    window.renderHome = function(tab) {
+        originalRenderHomeForProgress(tab);
+        setTimeout(() => {
+            initAllVideoProgressBars();
+            observeNewVideosForProgressBar();
+        }, 500);
+    };
+}
+
+// Also add when profile video plays
+const originalPlayProfileVideo = window.playProfileVideo;
+if (originalPlayProfileVideo) {
+    window.playProfileVideo = function(url) {
+        originalPlayProfileVideo(url);
+        setTimeout(() => {
+            const video = document.getElementById('fullScreenVideo');
+            if (video) {
+                const modal = document.getElementById('videoViewerModal');
+                if (modal && modal.style.display === 'flex') {
+                    setTimeout(() => {
+                        const container = modal.querySelector('.video-progress-container');
+                        if (!container) {
+                            addProgressBarToVideo(video);
+                        }
+                    }, 100);
+                }
+            }
+        }, 200);
+    };
+}
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(() => {
+        initAllVideoProgressBars();
+        observeNewVideosForProgressBar();
+    }, 1000);
+});
+
+// Also run after feed loads
+setInterval(() => {
+    const feed = document.getElementById('feedContainer');
+    if (feed && feed.children.length > 0) {
+        initAllVideoProgressBars();
+    }
+}, 2000);
