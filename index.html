@@ -1,467 +1,768 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="format-detection" content="telephone=no">
-    <title>Pikko Shorts - Premium</title>
+    <meta name="theme-color" content="#1a1a2e">
+    <title>স্টার টিভি পেমেন্ট - প্রিমিয়াম</title>
     
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     
-    <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Additional Critical CSS to prevent white/black screen -->
     <style>
-        /* Critical CSS - prevents layout shift and white screen */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
         }
-        
+
         body {
-            margin: 0;
-            padding: 0;
-            background: #000000;
+            background: linear-gradient(145deg, #0a0a1a, #0f0f1f);
             min-height: 100vh;
-            overflow-x: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Segoe UI', 'Poppins', 'Roboto', sans-serif;
+            color: #FFD966;
         }
-        
-        #mainContent {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            min-height: 100vh;
+
+        :root {
+            --gold-primary: #FFD700;
+            --gold-gradient: linear-gradient(135deg, #FFD700, #FFA500, #FFD700);
+            --gold-glow: 0 0 15px rgba(255, 215, 0, 0.6);
+            --bg-dark: #0a0a0f;
+            --card-gold: rgba(255, 215, 0, 0.1);
+            --border-gold: rgba(255, 215, 0, 0.3);
+            --wallet-red: linear-gradient(135deg, #dc2626, #991b1b);
+            --admin-blue: linear-gradient(135deg, #3b82f6, #1e3a8a);
         }
-        
-        /* Hide scrollbar but keep functionality */
-        ::-webkit-scrollbar {
-            width: 0;
-            background: transparent;
-        }
-        
-        /* WebView hardware acceleration fix */
-        .webview-fix {
-            transform: translate3d(0,0,0);
-            -webkit-transform: translate3d(0,0,0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
-        
-        /* Loading overlay */
-        .loading-overlay {
+
+        .login-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #000000;
+            background: linear-gradient(145deg, #0a0a0f, #1a1a1f);
             display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
             flex-direction: column;
-        }
-        
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255,255,255,0.2);
-            border-top-color: #fe2c55;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .loading-text {
-            color: white;
-            margin-top: 15px;
-            font-size: 14px;
-        }
-        
-        /* Toast message */
-        .toast-message {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 14px;
-            z-index: 10000;
-            display: none;
-            backdrop-filter: blur(10px);
-            white-space: nowrap;
-        }
-        
-        /* Offline banner */
-        .offline-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ff4444;
-            color: white;
-            padding: 12px;
-            text-align: center;
-            z-index: 10001;
-            display: flex;
-            justify-content: center;
             align-items: center;
-            gap: 15px;
+            justify-content: center;
+            z-index: 2000;
+            transition: all 0.5s ease;
         }
-        
-        .offline-banner button {
-            background: white;
+
+        .login-screen.hide {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .logo-area {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .logo-icon {
+            width: 100px;
+            height: 100px;
+            background: var(--gold-gradient);
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: var(--gold-glow);
+        }
+
+        .logo-icon i {
+            font-size: 50px;
+            color: #0a0a0f;
+        }
+
+        .logo-area h1 {
+            font-size: 28px;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .login-form {
+            width: 100%;
+            max-width: 320px;
+            padding: 0 20px;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 14px 18px;
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid var(--border-gold);
+            border-radius: 30px;
+            color: #FFD966;
+            font-size: 16px;
+            outline: none;
+            margin-bottom: 15px;
+        }
+
+        .login-input:focus {
+            border-color: #FFD700;
+            box-shadow: var(--gold-glow);
+        }
+
+        .login-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--gold-gradient);
             border: none;
-            padding: 5px 12px;
-            border-radius: 20px;
+            border-radius: 30px;
+            color: #0a0a0f;
+            font-size: 18px;
+            font-weight: bold;
             cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .app-screen {
+            display: none;
+            min-height: 100vh;
+            background: var(--bg-dark);
+        }
+
+        .app-screen.show {
+            display: block;
+        }
+
+        .app-header {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid var(--gold-primary);
+        }
+
+        .app-header h2 {
+            font-size: 20px;
+            background: var(--gold-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,215,0,0.15);
+            padding: 6px 12px;
+            border-radius: 30px;
+            cursor: pointer;
+            border: 1px solid var(--border-gold);
+        }
+
+        .admin-badge {
+            background: var(--admin-blue);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
             font-weight: bold;
         }
-        
-        /* Floating Star Container */
-        #floatingStarContainer {
-            position: fixed;
-            bottom: 100px;
-            right: 15px;
-            width: 60px;
-            height: 60px;
-            cursor: pointer;
-            z-index: 9999;
-            display: none;
-            background: rgba(0,0,0,0.7);
-            border-radius: 50%;
+
+        .dashboard {
+            padding: 20px;
+        }
+
+        .welcome-card {
+            background: var(--card-gold);
+            border-radius: 25px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: center;
+            border: 1px solid var(--border-gold);
             backdrop-filter: blur(5px);
+            box-shadow: var(--gold-glow);
+        }
+
+        .balance-card {
+            background: var(--wallet-red);
+            border-radius: 25px;
+            padding: 25px;
+            margin-bottom: 25px;
+            text-align: center;
+            border: 1px solid var(--gold-primary);
+            box-shadow: 0 0 20px rgba(220,38,38,0.3);
+        }
+
+        .balance-amount {
+            font-size: 42px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: var(--gold-glow);
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        .option-card {
+            background: var(--card-gold);
+            border-radius: 20px;
+            padding: 20px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border-gold);
+        }
+
+        .option-card:hover {
+            transform: translateY(-5px);
+            border-color: #FFD700;
+            box-shadow: var(--gold-glow);
+        }
+
+        .option-icon {
+            width: 55px;
+            height: 55px;
+            background: var(--gold-gradient);
+            border-radius: 18px;
+            display: flex;
             align-items: center;
             justify-content: center;
-            flex-direction: column;
+            margin: 0 auto 12px;
+            color: #0a0a0f;
+        }
+
+        .admin-panel-card {
+            background: var(--admin-blue);
+            border-radius: 20px;
+            padding: 20px 12px;
+            text-align: center;
+            cursor: pointer;
+            margin-top: 20px;
+            color: white;
+            font-weight: bold;
+            border: 1px solid var(--gold-primary);
+        }
+
+        .withdraw-btn {
+            background: var(--gold-gradient);
+            border: none;
+            padding: 12px;
+            border-radius: 30px;
+            font-weight: bold;
+            margin-top: 15px;
+            width: 100%;
+            color: #0a0a0f;
+            cursor: pointer;
+        }
+
+        .leaderboard-container {
+            background: var(--card-gold);
+            border-radius: 25px;
+            padding: 15px;
+            border: 1px solid var(--border-gold);
         }
         
-        .progress-ring {
-            position: absolute;
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid rgba(255,215,0,0.2);
+            color: #FFD966;
+        }
+        
+        .rank-badge {
+            background: var(--gold-gradient);
+            color: #0a0a0f;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .modal-overlay {
+            position: fixed;
             top: 0;
             left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            backdrop-filter: blur(8px);
+            z-index: 3000;
+            display: none;
+            justify-content: center;
+            align-items: center;
         }
         
-        .progress-ring__circle {
-            transition: stroke-dashoffset 0.1s linear;
-            stroke: #ffd700;
-            stroke-width: 3;
-            fill: none;
+        .modal-overlay.show { display: flex; }
+        
+        .modal-content {
+            background: #0f0f15;
+            border-radius: 30px;
+            width: 92%;
+            max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
+            border: 2px solid var(--gold-primary);
+            box-shadow: var(--gold-glow);
         }
         
-        .floating-star-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        .modal-header {
+            padding: 18px;
+            border-bottom: 1px solid var(--border-gold);
+            display: flex;
+            justify-content: space-between;
+            color: #FFD700;
         }
-        
-        #floatingStarText {
-            position: absolute;
-            bottom: -20px;
-            font-size: 10px;
-            color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 2px 6px;
-            border-radius: 10px;
-            white-space: nowrap;
-        }
-        
-        /* Bottom Navigation */
+
         .bottom-nav {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            background: var(--bg);
+            background: rgba(0,0,0,0.95);
             backdrop-filter: blur(20px);
             display: flex;
             justify-content: space-around;
-            padding: 8px 0 12px;
-            border-top: 1px solid var(--border);
-            z-index: 1000;
+            padding: 10px 0 18px;
+            border-top: 1px solid var(--gold-primary);
         }
         
         .nav-item {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 4px;
+            gap: 3px;
             cursor: pointer;
-            opacity: 0.7;
-            transition: all 0.2s;
-        }
-        
-        .nav-item.active {
-            opacity: 1;
-            color: var(--primary);
-        }
-        
-        .nav-item i {
-            font-size: 22px;
-        }
-        
-        .nav-item span {
-            font-size: 11px;
-        }
-        
-        .camera-btn-nav {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #fe2c55, #ff8c00);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: -15px;
-            box-shadow: 0 4px 15px rgba(254,44,85,0.4);
-        }
-        
-        .camera-btn-nav i {
-            font-size: 24px;
+            opacity: 0.6;
             color: white;
+        }
+        
+        .nav-item.active { opacity: 1; color: #FFD700; text-shadow: var(--gold-glow); }
+        .content-area { padding-bottom: 80px; }
+
+        .ticket-card {
+            background: linear-gradient(145deg, #1a1a1f, #0f0f15);
+            border-radius: 25px;
+            padding: 25px;
+            text-align: center;
+            border: 2px solid #FFD700;
+            margin: 15px;
+        }
+        
+        .book-btn {
+            background: var(--gold-gradient);
+            padding: 12px 30px;
+            border-radius: 40px;
+            border: none;
+            font-weight: bold;
+            margin-top: 20px;
+            cursor: pointer;
+        }
+        
+        .upi-input {
+            background: rgba(255,215,0,0.1);
+            border: 1px solid var(--border-gold);
+            padding: 12px;
+            border-radius: 30px;
+            width: 100%;
+            color: white;
+            margin: 10px 0;
+        }
+
+        .user-search-item {
+            background: rgba(255,215,0,0.1);
+            padding: 12px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .user-search-item:hover {
+            background: rgba(255,215,0,0.3);
+            transform: scale(1.02);
+        }
+
+        .chat-screen {
+            display: none;
+        }
+        
+        .chat-screen.active {
+            display: block;
+        }
+        
+        .back-btn {
+            background: var(--gold-gradient);
+            border: none;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            margin-right: 10px;
         }
     </style>
 </head>
-<body data-theme="dark" class="webview-fix">
-    <!-- Global Loader -->
-    <div id="globalLoader" class="loading-overlay">
-        <div class="spinner"></div>
-        <div class="loading-text" id="loaderText">Loading Pikko Shorts...</div>
+<body>
+    <!-- লগিন স্ক্রিন -->
+    <div class="login-screen" id="loginScreen">
+        <div class="logo-area"><div class="logo-icon"><i class="fas fa-tv"></i></div><h1>স্টার টিভি পেমেন্ট</h1><p>প্রিমিয়াম গোল্ডেন সিস্টেম</p></div>
+        <div class="login-form">
+            <input type="text" class="login-input" id="loginUsername" placeholder="ইউজারনেম">
+            <input type="password" class="login-input" id="loginPassword" placeholder="পাসওয়ার্ড">
+            <button class="login-btn" onclick="handleLogin()">লগিন <i class="fas fa-arrow-right"></i></button>
+            <div class="register-link" style="text-align:center;margin-top:15px;color:#FFD966;" onclick="showRegister()">নতুন ইউজার? <span style="color:#FFA500;">একাউন্ট খুলুন</span></div>
+        </div>
     </div>
 
-    <!-- Toast Message -->
-    <div class="toast-message" id="toastMessage"></div>
-
-    <!-- Offline Banner -->
-    <div id="offlineBanner" class="offline-banner" style="display: none;">
-        <i class="fas fa-wifi-slash"></i> No internet connection
-        <button onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+    <!-- রেজিস্টার স্ক্রিন -->
+    <div class="login-screen" id="registerScreen" style="display: none;">
+        <div class="logo-area"><div class="logo-icon"><i class="fas fa-user-plus"></i></div><h1>একাউন্ট খুলুন</h1></div>
+        <div class="login-form">
+            <input type="text" class="login-input" id="regFullname" placeholder="পুরো নাম">
+            <input type="text" class="login-input" id="regUsername" placeholder="ইউজারনেম">
+            <input type="password" class="login-input" id="regPassword" placeholder="পাসওয়ার্ড">
+            <button class="login-btn" onclick="handleRegister()">রেজিস্টার</button>
+            <div class="register-link" style="text-align:center;margin-top:15px;" onclick="showLogin()">লগিনে ফিরুন</div>
+        </div>
     </div>
 
-<!-- Floating Star Container - Perfectly Centered -->
-<div id="floatingStarContainer" style="display: none;">
-    <svg class="progress-ring" width="60" height="60" viewBox="0 0 60 60">
-        <circle class="progress-ring__circle-bg" cx="30" cy="30" r="26" fill="none" stroke="rgba(255,215,0,0.2)" stroke-width="3"/>
-        <circle class="progress-ring__circle" cx="30" cy="30" r="26" fill="none" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
-    </svg>
-    <div class="floating-star-icon">
-        <i class="fas fa-star"></i>
-    </div>
-    <div id="floatingStarText">0/50</div>
-</div>
-
-    <!-- Main Content Area -->
-    <div id="mainContent" class="content-area"></div>
-
-    <!-- Side Menu Overlay -->
-    <div class="side-menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-    
-    <!-- Side Menu -->
-    <div class="side-menu" id="sideMenu">
-        <h3 style="margin-bottom: 25px; padding-left: 10px; border-bottom: 1px solid var(--border); padding-bottom: 18px; display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-user-circle" style="font-size: 28px; color: var(--primary);"></i> Menu
-        </h3>
-        <div class="menu-item" onclick="openEditModal()"><i class="fas fa-user-edit"></i> Edit Profile</div>
-        <div class="menu-item" onclick="renderVerificationInfo()"><i class="fas fa-check-circle"></i> Verification</div>
-        <div class="menu-item" onclick="renderLeaderboard()"><i class="fas fa-trophy"></i> Leaderboard</div>
-        <div class="menu-item" onclick="renderPlaylists()"><i class="fas fa-list"></i> My Playlists</div>
-        <div class="menu-item" onclick="shareProfile()"><i class="fas fa-share-alt"></i> Share Profile</div>
-        <div class="menu-item" onclick="referEarn()"><i class="fas fa-user-friends"></i> Refer & Earn</div>
-        <div class="menu-item" onclick="openBackupRestore()"><i class="fas fa-database"></i> Backup / Restore</div>
-        <div class="menu-item" onclick="toggleTheme()"><i class="fas fa-moon" id="themeIcon"></i> <span id="themeText">Dark Mode</span><span style="margin-left:auto;" id="themeToggle">🌙</span></div>
-        <div class="menu-item" onclick="openAdminPanel()"><i class="fas fa-user-shield"></i> Admin Panel</div>
-        <div class="menu-item" onclick="goOffline()"><i class="fas fa-cloud-download-alt"></i> Offline Videos</div>
-        <div class="menu-item" onclick="handleLogout()" style="color: #fe2c55; margin-top: auto; border-top: 1px solid var(--border);"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+    <!-- মূল অ্যাপ -->
+    <div class="app-screen" id="appScreen">
+        <div class="app-header"><h2><i class="fas fa-tv"></i> স্টার টিভি গোল্ড</h2><div class="user-badge" onclick="showAccountModal()"><i class="fas fa-user-circle"></i><span id="headerUsername">ইউজার</span><span id="adminIndicator" class="admin-badge" style="display:none;">এডমিন</span></div></div>
+        <div class="content-area" id="mainContent">
+            <div class="dashboard">
+                <div class="welcome-card"><h3>স্বাগতম, <span id="welcomeName">ইউজার</span>!</h3><p>🌟 গোল্ডেন মেম্বারশিপ 🌟</p></div>
+                <div class="balance-card"><div class="balance-amount">₹ <span id="walletBalance">0</span></div><div>ওয়ালেট ব্যালেন্স</div><button class="withdraw-btn" onclick="requestWithdraw()"><i class="fas fa-hand-holding-usd"></i> টাকা তুলুন</button></div>
+                <div class="options-grid">
+                    <div class="option-card" onclick="showAccountModal()"><div class="option-icon"><i class="fas fa-user-circle"></i></div><h4>একাউন্ট</h4><p>প্রোফাইল দেখুন</p></div>
+                    <div class="option-card" onclick="showWalletModal()"><div class="option-icon"><i class="fas fa-wallet"></i></div><h4>ওয়ালেট</h4><p>ট্রানজেকশন ইতিহাস</p></div>
+                    <div class="option-card" onclick="showMessageModal()"><div class="option-icon"><i class="fas fa-comment-dots"></i></div><h4>মেসেজ</h4><p>চ্যাট করুন</p></div>
+                    <div class="option-card" onclick="showPointsModal()"><div class="option-icon"><i class="fas fa-chart-line"></i></div><h4>টোটাল স্কোর</h4><p>পয়েন্ট দেখুন</p></div>
+                </div>
+                <div id="adminPanelContainer" style="display:none;"><div class="admin-panel-card" onclick="promptAdminPassword()"><div class="option-icon"><i class="fas fa-user-shield"></i></div><h4>এডমিন প্যানেল</h4><p>ইউজার ম্যানেজ করুন</p></div></div>
+            </div>
+        </div>
+        <div class="bottom-nav">
+            <div class="nav-item active" onclick="showDashboard()"><i class="fas fa-home"></i><span>হোম</span></div>
+            <div class="nav-item" onclick="showLeaderboard()"><i class="fas fa-trophy"></i><span>লিডারবোর্ড</span></div>
+            <div class="nav-item" onclick="showTicketBooking()"><i class="fas fa-ticket-alt"></i><span>সুপার টিকিট</span></div>
+            <div class="nav-item" onclick="showAccountModal()"><i class="fas fa-user"></i><span>প্রোফাইল</span></div>
+        </div>
     </div>
 
-    <!-- Edit Profile Modal -->
-    <div id="editModal" class="modal-overlay"><div class="bottom-modal" style="height: auto; padding: 20px;"><h3 style="text-align:center; margin-bottom:25px;">Edit Profile</h3><div class="edit-pic-wrapper" onclick="document.getElementById('editFile').click()"><div id="previewPic" class="edit-pic"></div><div style="position:absolute; bottom:0; right:0; background:var(--primary); border-radius:50%; width:35px; height:35px; display:flex; justify-content:center; align-items:center;"><i class="fas fa-camera"></i></div></div><input type="file" id="editFile" hidden accept="image/*" onchange="previewImage(this)"><input type="text" id="editName" class="input-field" placeholder="Full Name"><input type="text" id="editUsername" class="input-field" placeholder="Username (without @)"><input type="text" id="editBio" class="input-field" placeholder="Bio"><button class="primary-btn" onclick="saveProfileChanges()">Save</button><button class="primary-btn" style="background:#444; margin-top:10px;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button></div></div>
-
-    <!-- Playlist Modal -->
-    <div id="playlistModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span id="playlistTitle">Create Playlist</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('playlistModal').style.display='none'"></i></div><div class="user-list-content" id="playlistContent"><input type="text" id="playlistName" class="input-field" placeholder="Playlist Name"><button class="primary-btn" onclick="createPlaylist()">Create</button></div></div></div>
-
-    <!-- Video Menu Modal -->
-    <div id="videoMenuModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span>Video Options</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('videoMenuModal').style.display='none'"></i></div><div class="user-list-content" id="videoMenuContent"></div></div></div>
-
-    <!-- User List Modal -->
-    <div id="userListModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span id="listTitle">List</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('userListModal').style.display='none'"></i></div><div class="user-list-content" id="listContent"></div></div></div>
-
-    <!-- Comment Modal -->
-    <div id="commentModal" class="modal-overlay" onclick="if(event.target===this)closeComments()"><div class="bottom-modal"><div style="padding:18px; text-align:center; border-bottom:1px solid var(--border); font-weight:bold; font-size:18px;">Comments <span id="commentCount">(0)</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="closeComments()"></i></div><div class="comment-list" id="commentList" style="flex:1; overflow-y:auto; padding:15px;"></div><div style="padding:15px; display:flex; gap:10px; border-top:1px solid var(--border); background:var(--bg);"><input type="text" id="commentInput" style="flex:1; background:var(--input-bg); border:none; padding:12px; color:var(--text); border-radius:30px; outline:none;" placeholder="Add a comment..."><button onclick="postComment()" style="color:white; background:var(--primary); font-weight:bold; border:none; padding:10px 20px; border-radius:30px; cursor:pointer;">Post</button></div></div></div>
-
-    <!-- Video Viewer Modal -->
-    <div id="videoViewerModal" class="modal-overlay"><i class="fas fa-times viewer-close" onclick="closeVideoViewer()"></i><video id="fullScreenVideo" class="viewer-video" controls autoplay></video></div>
-
-    <!-- Gift Modal -->
-    <div id="giftModal" class="modal-overlay"><div class="bottom-modal gift-modal"><div class="gift-header"><span>Send Stars to <span id="giftCreator"></span></span><i class="fas fa-times" onclick="document.getElementById('giftModal').style.display='none'"></i></div><div class="gift-content"><div class="gift-balance">Your Stars: <span id="senderStarBalance">0</span> ⭐</div><div class="gift-packages"><div class="gift-package" data-stars="1" onclick="selectGiftPackage(1)">1 ⭐</div><div class="gift-package" data-stars="5" onclick="selectGiftPackage(5)">5 ⭐</div><div class="gift-package" data-stars="10" onclick="selectGiftPackage(10)">10 ⭐</div><div class="gift-package" data-stars="20" onclick="selectGiftPackage(20)">20 ⭐</div><div class="gift-package" data-stars="50" onclick="selectGiftPackage(50)">50 ⭐</div></div><div class="gift-custom"><input type="range" id="giftSlider" min="1" max="100" value="1" oninput="updateGiftSlider()"><div class="gift-slider-value"><span id="giftSliderValue">1</span> ⭐</div></div><button class="gift-send-btn" onclick="sendGift()">Send Stars</button></div></div></div>
-
-    <!-- Verification Modal -->
-    <div id="verificationModal" class="modal-overlay"><div class="bottom-modal verification-modal"><div class="verification-header"><h2>Verification Status</h2><p>Complete requirements to unlock badges</p><i class="fas fa-times" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:20px; color:var(--muted-text);" onclick="document.getElementById('verificationModal').style.display='none'"></i></div><div class="verification-grid" id="userVerificationDetails">Loading...</div><div class="verification-footer"><i class="fas fa-info-circle"></i> Badges are automatically unlocked when requirements are met</div></div></div>
-
-    <!-- Camera Options Modal -->
-    <div id="cameraOptionsModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="camera-options-modal"><h3 style="text-align:center; margin-bottom:20px; color: var(--text);">Upload Video</h3><div class="camera-option-btn" onclick="openCamera('environment')"><i class="fas fa-camera"></i><span>Record with Camera</span></div><div class="camera-option-btn" onclick="openCamera('user')"><i class="fas fa-camera-retro"></i><span>Take Selfie Video</span></div><div class="camera-option-btn" onclick="openGallery()"><i class="fas fa-images"></i><span>Choose from Gallery</span></div><div class="camera-close-btn" onclick="document.getElementById('cameraOptionsModal').style.display='none'">Cancel</div></div></div>
-
-    <!-- Leaderboard Modal -->
-    <div id="leaderboardModal" class="modal-overlay" style="z-index: 6000;"><div class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;"><div style="padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 22px 22px 0 0; position: relative;"><h2 style="margin: 0; font-size: 22px; text-align: center;"><i class="fas fa-trophy" style="color:#ffd700;"></i> Top P-Coin Collectors</h2><i class="fas fa-times" style="position: absolute; right: 20px; top: 22px; font-size: 24px; cursor: pointer;" onclick="document.getElementById('leaderboardModal').style.display='none'"></i></div><div id="leaderboardContent" style="flex: 1; overflow-y: auto; padding: 15px; background: var(--bg);"></div></div></div>
-
-    <!-- Chat Modal -->
-    <div id="chatModal" class="modal-overlay" style="z-index: 6000;"><div class="bottom-modal" style="height: 85vh; display: flex; flex-direction: column; background: var(--bg);"><div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; background: var(--secondary-bg);"><i class="fas fa-arrow-left" style="font-size: 20px; cursor: pointer; color: var(--text);" onclick="closeChat()"></i><div id="chatUserAvatar" style="width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;"></div><div style="flex: 1;"><div id="chatUserName" style="font-weight: bold; font-size: 16px; color: var(--text);">Name</div><div id="chatUserHandle" style="font-size: 12px; color: var(--muted-text);">@username</div></div></div><div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px;"></div><div style="padding: 12px 15px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--secondary-bg);"><div class="chat-attach-btn" onclick="openMediaPicker()"><i class="fas fa-image"></i></div><input type="text" id="chatInput" placeholder="Type a message..." style="flex: 1; background: var(--input-bg); border: 1px solid var(--border); padding: 12px 18px; border-radius: 25px; color: var(--text); outline: none; font-size: 14px;"><button onclick="sendMessage()" style="background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 10px var(--primary-glow);"><i class="fas fa-paper-plane"></i></button></div></div></div>
-
-    <!-- Bottom Navigation -->
-    <div class="bottom-nav">
-        <div class="nav-item active" onclick="renderHome()"><i class="fas fa-home"></i><span>Home</span></div>
-        <div class="nav-item" onclick="renderExplore()"><i class="fas fa-search"></i><span>Explore</span></div>
-        <div class="nav-item" onclick="showCameraOptions()"><div class="camera-btn-nav"><i class="fas fa-camera"></i></div></div>
-        <div class="nav-item" onclick="renderNotify()"><i class="fas fa-bell"></i><span>Notify</span></div>
-        <div class="nav-item" onclick="renderProfile()"><i class="fas fa-user"></i><span>Profile</span></div>
-    </div>
-
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+    <!-- মডাল গুলো -->
+    <div id="accountModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>আমার একাউন্ট</h3><i class="fas fa-times" onclick="closeModal('accountModal')"></i></div><div class="modal-body"><div style="display:flex;justify-content:space-between;padding:12px;"><span>পুরো নাম</span><span id="accName">-</span><i class="fas fa-edit" style="color:#FFD700;cursor:pointer;" onclick="editField()"></i></div><div style="display:flex;justify-content:space-between;padding:12px;"><span>ইউজারনেম</span><span id="accUsername">-</span></div><div style="display:flex;justify-content:space-between;padding:12px;"><span>ওয়ালেট</span><span id="accBalance">₹0</span></div><div style="display:flex;justify-content:space-between;padding:12px;"><span>পয়েন্ট</span><span id="accPoints">0</span></div><div class="logout-btn" style="background:#FFD70020;border:1px solid #FFD700;padding:10px;border-radius:12px;text-align:center;margin-top:15px;cursor:pointer;" onclick="handleLogout()">লগআউট</div></div></div></div>
     
-    <!-- Firebase Messaging SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
+    <div id="walletModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>ট্রানজেকশন ইতিহাস</h3><i class="fas fa-times" onclick="closeModal('walletModal')"></i></div><div class="modal-body" id="transactionList"></div></div></div>
+    
+    <div id="pointsModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>🌟 মোট পয়েন্ট 🌟</h3><i class="fas fa-times" onclick="closeModal('pointsModal')"></i></div><div class="modal-body" style="text-align:center;"><div style="font-size:72px;font-weight:bold;color:#FFD700;text-shadow:0 0 15px gold;" id="totalPoints">0</div><div style="margin-top:20px;"><div style="display:flex;justify-content:space-between;padding:10px;"><span>পারচেজ পয়েন্ট</span><span id="pointsPurchase">0</span></div><div style="display:flex;justify-content:space-between;padding:10px;"><span>রেফারেল পয়েন্ট</span><span id="pointsReferral">0</span></div><div style="display:flex;justify-content:space-between;padding:10px;"><span>এডমিন বোনাস</span><span id="pointsAdmin">0</span></div></div></div></div></div>
 
-<script>
-// FCM Push Notification সিস্টেম
-(function initPushNotifications() {
-    // ফায়ারবেস ইতিমধ্যে initialized আছে app.js-এ
-    
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-            .then((registration) => {
-                console.log('Service Worker registered:', registration);
-                
-                // Firebase Messaging instance
-                const messaging = firebase.messaging();
-                
-                // VAPID key (আপনার Web Push Certificate থেকে)
-                const vapidKey = 'hIOJq7AvUSVaHQ9pUK4WPH4WKfL_4iOj9a3RJO-G9C8wFPtgEmOyYD797NKmeeu1hwQvlhftCw3ziq9gjL7A8M8KbTJwdPswohknuw4ciLU';
-                
-                // পারমিশন চাওয়া
-                async function requestNotificationPermission() {
-                    try {
-                        const permission = await Notification.requestPermission();
-                        if (permission === 'granted') {
-                            console.log('Notification permission granted');
-                            
-                            // টোকেন জেনারেট করুন
-                            const token = await messaging.getToken({
-                                vapidKey: vapidKey,
-                                serviceWorkerRegistration: registration
-                            });
-                            
-                            console.log('FCM Token:', token);
-                            
-                            // টোকেন ফায়ারবেসে সেভ করুন
-                            const user = getActiveUser();
-                            if (user && user.username) {
-                                await db.collection('users').doc(user.username).update({
-                                    fcmToken: token,
-                                    fcmTokenUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                                }).catch(e => console.log('Token save error:', e));
-                            }
-                            
-                            localStorage.setItem('fcmToken', token);
-                        } else {
-                            console.log('Notification permission denied');
-                        }
-                    } catch (error) {
-                        console.error('Error getting notification permission:', error);
-                    }
-                }
-                
-                // ফোরগ্রাউন্ড নোটিফিকেশন হ্যান্ডলার
-                messaging.onMessage((payload) => {
-                    console.log('Foreground message:', payload);
-                    if (payload.notification) {
-                        showToast(payload.notification.body, 4000);
-                    }
-                });
-                
-                // লগইন বা রিলোডে টোকেন আপডেট
-                if (Notification.permission === 'granted') {
-                    requestNotificationPermission();
-                } else if (Notification.permission !== 'denied') {
-                    // ইউজার অ্যাক্টিভ হলে ৫ সেকেন্ড পর চাইব
-                    setTimeout(() => {
-                        const user = getActiveUser();
-                        if (user) {
-                            requestNotificationPermission();
-                        }
-                    }, 5000);
-                }
-                
-                // টোকেন রিফ্রেশ লিসেনার
-                messaging.onTokenRefresh(async () => {
-                    const newToken = await messaging.getToken({ vapidKey: vapidKey });
-                    console.log('Token refreshed:', newToken);
-                    const user = getActiveUser();
-                    if (user) {
-                        await db.collection('users').doc(user.username).update({ fcmToken: newToken });
-                    }
-                });
-                
-            .catch(err => console.log('Service Worker registration failed:', err));
-    } else {
-        console.log('Service Worker not supported');
-    }
-})();
-</script>
-    
-    <!-- Main App JS -->
-    <script src="app.js"></script>
-    
-    <!-- Final Safety Script - ensures app loads even if app.js fails -->
+    <!-- মেসেজিং সিস্টেম আপগ্রেডেড -->
+    <div id="messageModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>মেসেজ</h3><i class="fas fa-times" onclick="closeModal('messageModal')"></i></div><div class="modal-body">
+        <div id="userSearchSection">
+            <input type="text" id="searchUserInput" class="upi-input" placeholder="🔍 ইউজার সার্চ করুন (নাম/ইউজারনেম)" style="margin-bottom:15px;">
+            <div id="searchResults" style="max-height:400px;overflow-y:auto;"></div>
+        </div>
+        <div id="chatSection" class="chat-screen" style="display:none;">
+            <button class="back-btn" onclick="backToUserList()"><i class="fas fa-arrow-left"></i> পিছনে</button>
+            <div id="chatWithName" style="margin:15px 0;font-weight:bold;color:gold;"></div>
+            <div id="chatMessagesArea" style="height:350px;overflow-y:auto;margin:15px 0;background:#1a1a1f;border-radius:20px;padding:15px;"></div>
+            <div style="display:flex;gap:8px;"><input id="chatInput" placeholder="মেসেজ লিখুন..." style="flex:1;background:#1f1f2f;border:1px solid gold;border-radius:30px;padding:10px;color:white;"><button class="send-btn" onclick="sendChatMessage()" style="background:gold;border:none;border-radius:30px;padding:10px 15px;">পাঠান</button></div>
+        </div>
+    </div></div></div>
+
+    <!-- লিডারবোর্ড মডাল -->
+    <div id="leaderboardModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3><i class="fas fa-trophy"></i> পয়েন্ট লিডারবোর্ড</h3><i class="fas fa-times" onclick="closeModal('leaderboardModal')"></i></div><div class="modal-body"><div id="leaderboardList" class="leaderboard-container"></div><div style="font-size:12px;text-align:center;margin-top:10px;">প্রতিদিন দুপুর ১টায় আপডেট হয় | ৩১ ডিসেম্বর রিসেট হয়</div></div></div></div>
+<!-- টিকিট মডাল -->
+    <div id="ticketModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>🎫 সুপার অ্যাওয়ার্ড টিকিট</h3><i class="fas fa-times" onclick="closeModal('ticketModal')"></i></div><div class="modal-body"><div class="ticket-card"><i class="fas fa-ticket-alt" style="font-size:50px;color:gold;"></i><h2 style="color:gold;">প্রিমিয়াম টিকিট</h2><p id="ticketPriceDisplay">মূল্য: ₹০</p><button class="book-btn" onclick="proceedToBook()">বুক করুন</button></div></div></div></div>
+
+    <!-- ইউপিআই পেমেন্ট মডাল -->
+    <div id="upiModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>💎 পেমেন্ট সম্পন্ন করুন</h3><i class="fas fa-times" onclick="closeModal('upiModal')"></i></div><div class="modal-body"><p style="background:#FFD70020;padding:10px;border-radius:15px;">ইউপিআই আইডি: <strong>8391921082@ibl</strong></p><input type="text" id="tokenInput" placeholder="টোকেন আইডি লিখুন" class="upi-input"><button class="book-btn" onclick="verifyAndBookTicket()" style="width:100%;">বুকিং কনফার্ম</button><p style="font-size:12px;margin-top:10px;">পেমেন্ট করার পর টোকেন দিন</p></div></div></div>
+
+    <!-- এডমিন প্যানেল -->
+    <div id="adminModal" class="modal-overlay"><div class="modal-content"><div class="modal-header"><h3>এডমিন প্যানেল 🔐</h3><i class="fas fa-times" onclick="closeModal('adminModal')"></i></div><div class="modal-body"><input type="text" id="adminSearchUser" placeholder="ইউজার সার্চ করুন..." style="width:100%;padding:10px;margin-bottom:15px;background:#111;border:1px solid gold;border-radius:30px;color:white;"><div id="adminUserList"></div><div style="margin-top:15px;"><input type="number" id="ticketPriceInput" placeholder="টিকিটের মূল্য সেট করুন (₹)" class="upi-input"><button class="admin-btn points" onclick="setTicketPrice()" style="background:gold;color:black;padding:10px;border-radius:20px;">মূল্য আপডেট করুন</button></div></div></div></div>
+
+    <div class="toast" id="toast" style="position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:gold;color:black;padding:10px 20px;border-radius:30px;display:none;z-index:9999;font-weight:bold;"></div>
+
     <script>
-        (function() {
-            // Safety timeout - hide loader after 5 seconds even if app.js fails
-            setTimeout(function() {
-                var loader = document.getElementById('globalLoader');
-                if (loader && loader.style.display !== 'none') {
-                    loader.style.display = 'none';
-                    var mainContent = document.getElementById('mainContent');
-                    if (mainContent && (!mainContent.innerHTML || mainContent.innerHTML.trim() === '')) {
-                        mainContent.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; text-align:center;"><div style="width:80px; height:80px; background:linear-gradient(135deg,#fe2c55,#ff8c00); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:20px;"><i class="fas fa-video" style="font-size:40px; color:white;"></i></div><h2 style="margin-bottom:10px;">Welcome to Pikko Shorts</h2><p style="color:#888; margin-bottom:20px;">Tap to continue</p><button onclick="location.reload()" style="background:#fe2c55; color:white; border:none; padding:12px 30px; border-radius:30px;">Refresh App</button></div>';
-                    }
-                }
-            }, 5000);
-            
-            // WebView hardware acceleration fix
-            if (navigator.userAgent.includes('Android')) {
-                document.body.style.transform = 'translate3d(0,0,0)';
-                document.body.style.webkitTransform = 'translate3d(0,0,0)';
+        const firebaseConfig = { apiKey: "AIzaSyB02MI34M0jcu3HzsiilZ4PjS65qkwmhDc", authDomain: "pikko-shorts.firebaseapp.com", projectId: "pikko-shorts", storageBucket: "pikko-shorts.firebasestorage.app", messagingSenderId: "207121588205", appId: "1:207121588205:web:3d4da14f48fd38622bd1e4" };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        let currentUser = null, currentChatReceiver = null;
+        let ticketPrice = 0;
+
+        async function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            if (!username || !password) return showToast('সব ঘর পূরণ করুন');
+            try {
+                const email = username + "@startv.com";
+                const cred = await auth.signInWithEmailAndPassword(email, password);
+                const userDoc = await db.collection('users').doc(cred.user.uid).get();
+                if (!userDoc.exists) { await auth.signOut(); showToast('ইউজার পাওয়া যায়নি'); return; }
+                currentUser = userDoc.data(); currentUser.uid = cred.user.uid;
+                updateUI();
+                document.getElementById('loginScreen').classList.add('hide');
+                document.getElementById('appScreen').classList.add('show');
+                showToast(`স্বাগতম ${currentUser.fullname}`);
+                setupRealtimeListeners();
+            } catch (err) { showToast('ভুল তথ্য'); }
+        }
+
+        async function handleRegister() {
+            const fullname = document.getElementById('regFullname').value.trim();
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            if (!fullname || !username || !password) return showToast('সব ঘর পূরণ করুন');
+            try {
+                const email = username + "@startv.com";
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                const newUser = { fullname, username, wallet: 0, points: { total: 0, purchase: 0, referral: 0, admin: 0 }, transactions: [], joinDate: new Date().toLocaleString(), isAdmin: false };
+                await db.collection('users').doc(cred.user.uid).set(newUser);
+                showToast('একাউন্ট তৈরি হয়েছে! লগিন করুন');
+                showLogin();
+            } catch (err) { showToast(err.message); }
+        }
+
+        function setupRealtimeListeners() {
+            if(!currentUser) return;
+            db.collection('users').doc(currentUser.uid).onSnapshot(doc => {
+                if(doc.exists) { currentUser = doc.data(); currentUser.uid = doc.id; updateUI(); }
+            });
+        }
+
+        function updateUI() {
+            if (!currentUser) return;
+            document.getElementById('headerUsername').innerHTML = currentUser.fullname;
+            document.getElementById('welcomeName').innerHTML = currentUser.fullname;
+            document.getElementById('walletBalance').innerHTML = currentUser.wallet;
+            document.getElementById('adminPanelContainer').style.display = currentUser.isAdmin ? 'block' : 'none';
+            document.getElementById('adminIndicator').style.display = currentUser.isAdmin ? 'inline-block' : 'none';
+            document.getElementById('accName').innerHTML = currentUser.fullname;
+            document.getElementById('accUsername').innerHTML = currentUser.username;
+            document.getElementById('accBalance').innerHTML = `₹ ${currentUser.wallet}`;
+            document.getElementById('accPoints').innerHTML = currentUser.points.total;
+            document.getElementById('totalPoints').innerHTML = currentUser.points.total;
+            document.getElementById('pointsPurchase').innerHTML = currentUser.points.purchase;
+            document.getElementById('pointsReferral').innerHTML = currentUser.points.referral;
+            document.getElementById('pointsAdmin').innerHTML = currentUser.points.admin;
+            const txnList = document.getElementById('transactionList');
+            if (currentUser.transactions?.length) txnList.innerHTML = currentUser.transactions.slice().reverse().map(t => `<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid gold;">${t.date} <span style="color:${t.amount>0?'#FFD700':'#dc2626'}">₹${t.amount}</span> <span>${t.note}</span></div>`).join('');
+            else txnList.innerHTML = '<div>কোনো লেনদেন নেই</div>';
+        }
+
+        async function requestWithdraw() { 
+            if(currentUser.wallet <= 0) return showToast('ব্যালেন্স কম');
+            showToast('টাকা তোলার অনুরোধ প্রেরিত'); 
+            if(!currentUser.isAdmin) { 
+                await db.collection('withdrawals').add({ userId: currentUser.uid, amount: currentUser.wallet, status: 'pending', time: Date.now() }); 
+                showToast('অনুরোধ পাঠানো হয়েছে'); 
             }
-            
-            // Handle visibility change (prevents black screen on resume)
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    setTimeout(function() {
-                        window.dispatchEvent(new Event('resize'));
-                    }, 100);
+        }
+        
+        async function editField() { const newName = prompt('নতুন নাম লিখুন:', currentUser.fullname); if(newName) { await db.collection('users').doc(currentUser.uid).update({ fullname: newName }); currentUser.fullname = newName; updateUI(); } }
+
+        // লিডারবোর্ড রিয়েলটাইম
+        async function loadLeaderboard() {
+            const snapshot = await db.collection('users').get();
+            let users = []; snapshot.forEach(doc => users.push({ ...doc.data(), uid: doc.id }));
+            users.sort((a,b) => b.points.total - a.points.total);
+            const container = document.getElementById('leaderboardList');
+            container.innerHTML = users.slice(0, 20).map((u, idx) => `<div class="leaderboard-item"><span><span class="rank-badge">${idx+1}</span> ${u.fullname}</span><span style="color:gold;">${u.points.total} পয়েন্ট</span></div>`).join('');
+        }
+
+        function showLeaderboard() { loadLeaderboard(); document.getElementById('leaderboardModal').classList.add('show'); }
+
+        // টিকিট সিস্টেম
+        async function loadTicketPrice() { const doc = await db.collection('settings').doc('ticket').get(); ticketPrice = doc.exists ? doc.data().price || 0 : 0; document.getElementById('ticketPriceDisplay').innerText = `মূল্য: ₹${ticketPrice}`; }
+        async function setTicketPrice() { const price = parseInt(document.getElementById('ticketPriceInput').value); if(price && currentUser.isAdmin) { await db.collection('settings').doc('ticket').set({ price }); ticketPrice = price; showToast('টিকিটের মূল্য আপডেট হয়েছে'); loadTicketPrice(); } }
+        function showTicketBooking() { loadTicketPrice(); document.getElementById('ticketModal').classList.add('show'); }
+        function proceedToBook() { if(ticketPrice <= 0) { showToast('এডমিন টিকিটের মূল্য সেট করেননি'); return; } document.getElementById('upiModal').classList.add('show'); }
+        
+        async function verifyAndBookTicket() {
+            const token = document.getElementById('tokenInput').value.trim();
+            if(!token) return showToast('টোকেন আইডি দিন');
+            const usedCheck = await db.collection('usedTokens').doc(token).get();
+            if(usedCheck.exists) return showToast('টোকেন ইতিমধ্যে ব্যবহার করা হয়েছে!');
+            await db.collection('usedTokens').doc(token).set({ usedBy: currentUser.uid, time: Date.now() });
+            await db.collection('ticketBookings').add({ userId: currentUser.uid, userName: currentUser.fullname, token, price: ticketPrice, status: 'booked', time: Date.now() });
+            // হোয়াটসঅ্যাপ রিডাইরেক্ট
+            const waMessage = `New%20Ticket%20Booking%0AUser:%20${currentUser.fullname}%0AToken:%20${token}%0APrice:%20₹${ticketPrice}`;
+            window.open(`https://wa.me/918391921082?text=${waMessage}`, '_blank');
+            showToast('টিকিট বুকিং সম্পন্ন! হোয়াটসঅ্যাপে তথ্য পাঠানো হয়েছে');
+            closeModal('upiModal');
+            closeModal('ticketModal');
+        }
+
+        // আপগ্রেডেড মেসেজিং সিস্টেম
+        async function searchUsers() {
+            const searchTerm = document.getElementById('searchUserInput').value.toLowerCase();
+            const snapshot = await db.collection('users').get();
+            let users = [];
+            snapshot.forEach(doc => {
+                if(doc.id !== currentUser.uid) {
+                    const data = doc.data();
+                    if(data.fullname.toLowerCase().includes(searchTerm) || data.username.toLowerCase().includes(searchTerm)) {
+                        users.push({ ...data, uid: doc.id });
+                    }
                 }
             });
+            const container = document.getElementById('searchResults');
+            if(users.length === 0) { container.innerHTML = '<div style="text-align:center;color:gray;">কোনো ইউজার পাওয়া যায়নি</div>'; return; }
+            container.innerHTML = users.map(u => `<div class="user-search-item" onclick="startChat('${u.uid}', '${u.fullname}')">
+                <i class="fas fa-user-circle"></i> <strong>${u.fullname}</strong> (@${u.username})
+            </div>`).join('');
+        }
+
+        window.startChat = async (uid, name) => {
+            currentChatReceiver = { uid, name };
+            document.getElementById('userSearchSection').style.display = 'none';
+            document.getElementById('chatSection').style.display = 'block';
+            document.getElementById('chatSection').classList.add('active');
+            document.getElementById('chatWithName').innerHTML = `<i class="fas fa-comment"></i> ${name} এর সাথে চ্যাট`;
+            await loadMessages(uid);
             
-            console.log("✅ Index.html loaded with all safety features");
+            // রিয়েলটাইম মেসেজ লিসেনার
+            db.collection('messages').where('participants', 'array-contains', currentUser.uid).onSnapshot(() => {
+                if(currentChatReceiver) loadMessages(currentChatReceiver.uid);
+            });
+        };
+
+        function backToUserList() {
+            document.getElementById('userSearchSection').style.display = 'block';
+            document.getElementById('chatSection').style.display = 'none';
+            document.getElementById('searchUserInput').value = '';
+            searchUsers();
+        }
+
+        async function loadMessages(receiverUid) {
+            const msgs = await db.collection('messages').get();
+            let messages = [];
+            msgs.forEach(doc => {
+                const m = doc.data();
+                if((m.sender === currentUser.uid && m.receiver === receiverUid) || (m.sender === receiverUid && m.receiver === currentUser.uid)) {
+                    messages.push(m);
+                }
+            });
+            messages.sort((a,b) => a.timestamp - b.timestamp);
+            const container = document.getElementById('chatMessagesArea');
+            if(messages.length === 0) { container.innerHTML = '<div style="text-align:center;color:gray;">কোনো মেসেজ নেই। হ্যালো বলুন!</div>'; return; }
+            container.innerHTML = messages.map(m => `<div style="text-align:${m.sender === currentUser.uid ? 'right' : 'left'};margin:10px;">
+                <div style="display:inline-block;background:${m.sender === currentUser.uid ? '#FFD700' : '#2a2a3a'};padding:10px 18px;border-radius:20px;color:${m.sender === currentUser.uid ? '#000' : '#fff'};max-width:80%;">
+                    ${m.text}<div style="font-size:10px;margin-top:5px;color:gray;">${new Date(m.timestamp).toLocaleTimeString()}</div>
+                </div>
+            </div>`).join('');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function sendChatMessage() {
+            const text = document.getElementById('chatInput').value.trim();
+            if(!currentChatReceiver || !text) return showToast('ইউজার ও মেসেজ দিন');
+            await db.collection('messages').add({
+                sender: currentUser.uid,
+                senderName: currentUser.fullname,
+                receiver: currentChatReceiver.uid,
+                receiverName: currentChatReceiver.name,
+                text: text,
+                timestamp: Date.now(),
+                participants: [currentUser.uid, currentChatReceiver.uid]
+            });
+            document.getElementById('chatInput').value = '';
+            await loadMessages(currentChatReceiver.uid);
+        }
+
+        // এডমিন প্যানেল
+        function promptAdminPassword() { if(!currentUser?.isAdmin) return; const pwd = prompt("🔐 এডমিন পাসওয়ার্ড:"); if(pwd === "0786") loadAdminUserList(), document.getElementById('adminModal').classList.add('show'); else showToast("ভুল পাসওয়ার্ড"); }
+        
+        async function loadAdminUserList(search='') {
+            const snap = await db.collection('users').get();
+            let users = []; snap.forEach(doc => { const d=doc.data(); if(!d.isAdmin && (!search || d.fullname.toLowerCase().includes(search.toLowerCase()))) users.push({...d, uid: doc.id}); });
+            const container = document.getElementById('adminUserList');
+            container.innerHTML = users.map(u => `<div style="background:#1a1a1f;margin-bottom:10px;padding:12px;border-radius:15px;border:1px solid gold;">
+                <strong>${u.fullname}</strong> (₹${u.wallet} | ${u.points.total} পয়েন্ট)
+                <div style="display:flex;gap:8px;margin-top:8px;"><input id="amt_${u.uid}" placeholder="₹" style="background:#111;border:1px solid gold;border-radius:20px;padding:6px;width:80px;">
+                <button onclick="adminModifyMoney('${u.uid}','add')" style="background:gold;border:none;border-radius:20px;padding:6px 12px;">+₹</button>
+                <button onclick="adminModifyMoney('${u.uid}','sub')" style="background:orange;border:none;border-radius:20px;">-₹</button></div>
+                <div><input id="pt_${u.uid}" placeholder="পয়েন্ট" style="background:#111;border:1px solid gold;border-radius:20px;padding:6px;width:80px;">
+                <button onclick="adminModifyPoints('${u.uid}','add')" style="background:gold;">+পয়েন্ট</button>
+                <button onclick="adminModifyPoints('${u.uid}','sub')" style="background:orange;">-পয়েন্ট</button></div>
+            </div>`).join('');
+        }
+        
+        window.adminModifyMoney = async (uid, type) => {
+            let amt = parseInt(document.getElementById(`amt_${uid}`)?.value); if(!amt) return;
+            const ref = db.collection('users').doc(uid); const doc = await ref.get(); let newWallet = doc.data().wallet;
+            if(type==='add') newWallet += amt; else newWallet = Math.max(0, newWallet-amt);
+            await ref.update({ wallet: newWallet, transactions: [...(doc.data().transactions||[]), { date: new Date().toLocaleString(), amount: type==='add'?amt:-amt, note: 'এডমিন' }] });
+            if(uid === currentUser?.uid) { const upd = await ref.get(); currentUser = upd.data(); currentUser.uid=uid; updateUI(); }
+            showToast('আপডেট হয়েছে');
+            loadAdminUserList(document.getElementById('adminSearchUser')?.value);
+        };
+        
+        window.adminModifyPoints = async (uid, type) => {
+            let pts = parseInt(document.getElementById(`pt_${uid}`)?.value); if(!pts) return;
+            const ref = db.collection('users').doc(uid); const doc = await ref.get(); let newTotal = doc.data().points.total, newAdmin = doc.data().points.admin;
+            if(type==='add') { newTotal += pts; newAdmin += pts; } else { newTotal = Math.max(0, newTotal-pts); newAdmin = Math.max(0, newAdmin-pts); }
+            await ref.update({ 'points.total': newTotal, 'points.admin': newAdmin });
+            if(uid === currentUser?.uid) { const upd = await ref.get(); currentUser = upd.data(); currentUser.uid=uid; updateUI(); }
+            showToast('পয়েন্ট আপডেট হয়েছে');
+            loadAdminUserList(document.getElementById('adminSearchUser')?.value);
+        };
+
+        if(document.getElementById('adminSearchUser')) document.getElementById('adminSearchUser').addEventListener('input', (e) => loadAdminUserList(e.target.value));
+        if(document.getElementById('searchUserInput')) document.getElementById('searchUserInput').addEventListener('input', () => searchUsers());
+
+        function showMessageModal() { document.getElementById('messageModal').classList.add('show'); searchUsers(); }
+        function showDashboard() { document.querySelector('.dashboard').style.display = 'block'; document.querySelectorAll('.nav-item').forEach((n,i)=>{ if(i===0)n.classList.add('active'); else n.classList.remove('active'); }); }
+        function showAccountModal() { updateUI(); document.getElementById('accountModal').classList.add('show'); }
+        function showWalletModal() { updateUI(); document.getElementById('walletModal').classList.add('show'); }
+        function showPointsModal() { updateUI(); document.getElementById('pointsModal').classList.add('show'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+        function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; setTimeout(() => t.style.display = 'none', 2000); }
+        async function handleLogout() { await auth.signOut(); currentUser=null; document.getElementById('loginScreen').classList.remove('hide'); document.getElementById('appScreen').classList.remove('show'); showToast('লগআউট হয়েছে'); }
+        
+        document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',(e)=>{ if(e.target===m) m.classList.remove('show'); }));
+        
+        auth.onAuthStateChanged(async (user) => { 
+            if(user) { 
+                const doc = await db.collection('users').doc(user.uid).get(); 
+                if(doc.exists) { 
+                    currentUser=doc.data(); currentUser.uid=user.uid; 
+                    updateUI(); 
+                    setupRealtimeListeners();
+                    document.getElementById('loginScreen').classList.add('hide'); 
+                    document.getElementById('appScreen').classList.add('show'); 
+                } else await auth.signOut(); 
+            } else { 
+                document.getElementById('loginScreen').classList.remove('hide'); 
+                document.getElementById('appScreen').classList.remove('show'); 
+            } 
+        });
+        
+        (async () => { 
+            const q = await db.collection('users').where('isAdmin','==',true).get(); 
+            if(q.empty) { 
+                try { 
+                    const cred = await auth.createUserWithEmailAndPassword("admin@startv.com","admin123"); 
+                    await db.collection('users').doc(cred.user.uid).set({ fullname:"সুপার এডমিন", username:"admin", wallet:0, points:{total:0,purchase:0,referral:0,admin:0}, transactions:[], joinDate:new Date().toLocaleString(), isAdmin:true }); 
+                } catch(e){} 
+            } 
+            await loadTicketPrice(); 
         })();
+        
+        function showRegister() { document.getElementById('loginScreen').style.display = 'none'; document.getElementById('registerScreen').style.display = 'flex'; }
+        function showLogin() { document.getElementById('registerScreen').style.display = 'none'; document.getElementById('loginScreen').style.display = 'flex'; }
     </script>
 </body>
 </html>
