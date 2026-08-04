@@ -793,7 +793,12 @@
         function hideLoader() { document.getElementById('globalLoader').style.display = 'none'; }
         function safeStr(str) { return (str && str !== 'undefined' && str !== 'null') ? str.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ') : ''; }
         
-        function getThumbUrl(url) { return (url && url.includes('cloudinary.com') && url.endsWith('.mp4')) ? url.replace('.mp4', '.jpg') : (url || ''); }
+      function getThumbUrl(url) { 
+    if(url && url.includes('cloudinary.com') && url.endsWith('.mp4')) {
+        return url.replace('.mp4', '.jpg');
+    }
+    return ''; 
+}  
         
         function getOptimizedVideoUrl(url) {
             if (url && url.includes('cloudinary.com') && url.includes('/upload/')) {
@@ -1793,24 +1798,48 @@
         function openUploadPreview(blobOrFile) { selectedFile = blobOrFile; document.getElementById('uploadFullScreenPage').style.display = 'flex'; document.getElementById('uploadPreviewVideo').src = URL.createObjectURL(selectedFile); document.getElementById('uploadCaption').value = ''; }
         function closeUploadPage() { document.getElementById('uploadFullScreenPage').style.display = 'none'; document.getElementById('uploadPreviewVideo').pause(); renderHome(currentTab); }
 
-        function startVideoUpload() {
-            if (!selectedFile) return showToast("No video selected");
-            const caption = document.getElementById('uploadCaption').value;
-            closeUploadPage(); showLoader();
-            const formData = new FormData(); formData.append('file', selectedFile); formData.append('upload_preset', 'ml_default');
-            const xhr = new XMLHttpRequest(); xhr.open('POST', 'https://api.cloudinary.com/v1_1/dtzjo3zdp/video/upload', true);
-            xhr.onload = async function() {
-                hideLoader();
-                if (xhr.status === 200) {
-                    const data = JSON.parse(xhr.responseText);
-                    await db.collection('videos').add({
-                        video_url: data.secure_url, caption: caption || '', username: currentUser.username, userId: currentUser.id, userPic: currentUser.profilePic || '', bio: currentUser.bio || '', likes_count: 0, comment_count: 0, views_count: 0, verification: currentUser.verification, createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    showToast("Uploaded Successfully!"); fetchBackgroundVideos(); setTimeout(() => renderHome(), 1000);
-                } else { showToast("Upload failed."); }
-            };
-            xhr.onerror = function() { hideLoader(); showToast("Network error."); }; xhr.send(formData);
+   async function startVideoUpload() {
+    if (!selectedFile) return showToast("No video selected");
+    const caption = document.getElementById('uploadCaption').value;
+    closeUploadPage(); showLoader();
+
+    const fileName = 'videos/' + Date.now() + '_' + selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "");
+
+    try {
+        const res = await fetch('https://pikkoshorts-cache.sudiptak503.workers.dev/', {
+            method: 'POST',
+            headers: {
+                'X-File-Name': fileName,
+                'Content-Type': selectedFile.type || 'video/mp4'
+            },
+            body: selectedFile
+        });
+
+        hideLoader();
+        if (res.ok) {
+            const data = await res.json();
+            await db.collection('videos').add({
+                video_url: data.url, 
+                caption: caption || '', 
+                username: currentUser.username, 
+                userId: currentUser.id, 
+                userPic: currentUser.profilePic || '', 
+                bio: currentUser.bio || '', 
+                likes_count: 0, comment_count: 0, views_count: 0, 
+                verification: currentUser.verification, 
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showToast("Uploaded Successfully!"); 
+            localStorage.removeItem('pikko_video_cache');
+            setTimeout(() => renderHome(), 1000);
+        } else { 
+            showToast("Upload failed."); 
         }
+    } catch (e) { 
+        hideLoader(); 
+        showToast("Network error."); 
+    }
+}     
 
         // ===== EXPLORE, SEARCH =====
         function renderExplore() {
@@ -1834,7 +1863,8 @@
                 snapshot.forEach(doc => {
                     const vid = doc.data();
                     const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
-                    feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                    feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><video src="${getOptimizedVideoUrl(vid.video_url)}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover; pointer-events:none;"></video>
+<div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
                 });
             }).catch(err => { console.log(err); });
         }
@@ -1937,7 +1967,8 @@
                 snapshot.forEach(doc => {
                     const vid = doc.data();
                     const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
-                    grid.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                    grid.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><video src="${getOptimizedVideoUrl(vid.video_url)}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover; pointer-events:none;"></video>
+<div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
                 });
             });
         }
@@ -2442,7 +2473,8 @@ window.saveEditedProfile = async () => {
                     snapshot.forEach(doc => {
                         const vid = doc.data();
                         const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
-                        feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                        feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><video src="${getOptimizedVideoUrl(vid.video_url)}#t=0.1" preload="metadata" muted playsinline style="width:100%;height:100%;object-fit:cover; pointer-events:none;"></video>
+<div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
                     });
                 }).catch(err => { console.log(err); });
             };
