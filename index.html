@@ -2231,6 +2231,720 @@ window.saveEditedProfile = async () => {
             }
         })();
     </script>
+    <!-- ======================================================== -->
+    <!-- MEGA UPDATE: DOWNLOAD VIDEO & PROFILE BUFFERING FIX -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // 1. Profile Buffering Fix (Overriding renderProfile function)
+            window.renderProfile = function() {
+                updateNavActive(4); 
+                pauseAllVideos();
+                showLoader(); // <-- প্রোফাইল লোড হওয়ার আগে বাফারিং শুরু
+                
+                let u = getUserData();
+                
+                // Re-fetch profile to fix follower count issue immediately
+                db.collection('users').doc(u.id).get().then(doc => {
+                    if(doc.exists) {
+                        let d = doc.data();
+                        u.followersArray = d.followersArray || [];
+                        u.following = d.following || [];
+                        saveUserData(u);
+                    }
+                    
+                    let badge = getVerificationBadge(u.verification);
+                    let avatarClass = (u.verification === 'golden') ? 'vip-frame' : '';
+                    let initial = u.username ? safeStr(u.username).charAt(0).toUpperCase() : 'U';
+                    let picHtml = (u.profilePic && u.profilePic.includes('http')) ? `<img src="${u.profilePic}" class="profile-pic ${avatarClass}">` : `<div class="profile-pic ${avatarClass}" style="display:flex; align-items:center; justify-content:center; font-size:35px; color:#000;">${initial}</div>`;
 
+                    contentDiv.innerHTML = `
+                        <div class="profile-header">
+                            <i class="fas fa-ellipsis-v menu-icon-top-left" onclick="openProfileMenu()"></i>
+                            <i class="fas fa-wallet wallet-icon-top" onclick="openWallet()"></i>
+                            ${picHtml}
+                            <h2 style="font-size:22px; margin-bottom:5px;">@${safeStr(u.username)} ${badge}</h2>
+                            <p style="color:var(--muted-text); font-size:14px; margin-bottom:15px;">${safeStr(u.bio) || ''}</p>
+                            <div class="profile-stats">
+                                <div class="profile-stat-item"><strong id="postCount">0</strong><span>Posts</span></div>
+                                <div class="profile-stat-item" onclick="openFollowList('Followers')"><strong>${(u.followersArray || []).length}</strong><span>Followers</span></div>
+                                <div class="profile-stat-item" onclick="openFollowList('Following')"><strong>${(u.following || []).length}</strong><span>Following</span></div>
+                            </div>
+                            <button class="edit-profile-btn" onclick="openEditProfile()">Edit Profile</button>
+                        </div>
+                        <div class="profile-tabs">
+                            <div class="profile-tab active" onclick="switchProfileTab('posts', this)"><i class="fas fa-border-all"></i></div>
+                            <div class="profile-tab" onclick="switchProfileTab('saved', this)"><i class="fas fa-bookmark"></i></div>
+                        </div>
+                        <div class="profile-grid" id="profileVideosGrid"></div>`;
+                    
+                    loadProfileVideos('posts');
+                    hideLoader(); // <-- ডাটা লোড হয়ে গেলে বাফারিং বন্ধ
+                }).catch(error => {
+                    hideLoader(); // <-- এরর আসলেও বাফারিং বন্ধ হবে
+                    showToast("Profile load error");
+                });
+            };
+
+            // 2. Video Download Option Fix (Overriding renderHomeFeed function to add Download Button)
+            window.renderHomeFeed = function(videos, tab) {
+                let vids = [...videos];
+                if (tab === 'following' && currentUser) { vids = vids.filter(v => (currentUser.following || []).includes(v.userId)); } 
+                else if (tab === 'foryou') { vids.sort(() => Math.random() - 0.5); }
+
+                if (vids.length === 0) {
+                    contentDiv.innerHTML = `<div class="top-tabs-container"><div class="top-tab ${tab === 'following' ? 'active' : ''}" onclick="renderHome('following')">Following</div><div class="top-tab ${tab === 'foryou' ? 'active' : ''}" onclick="renderHome('foryou')">For You</div></div><p style="text-align:center; padding-top:50vh; color:var(--muted-text);">No videos found.</p>`;
+                    return;
+                }
+
+                let html = `<div class="top-tabs-container"><div class="top-tab ${tab === 'following' ? 'active' : ''}" onclick="renderHome('following')">Following</div><div class="top-tab ${tab === 'foryou' ? 'active' : ''}" onclick="renderHome('foryou')">For You</div></div><div id="feedContainer" class="video-feed">`;
+
+                vids.forEach(vid => {
+                    const isSaved = (currentUser?.saved || []).includes(vid.id);
+                    const initial = vid.username ? safeStr(vid.username).charAt(0).toUpperCase() : 'U';
+                    const avatarClass = (vid.verification === 'golden') ? 'vip-frame' : '';
+                    const badge = getVerificationBadge(vid.verification);
+                    
+                    const avatarContent = (vid.userPic && vid.userPic.includes('http')) ? 
+                        `<img src="${vid.userPic}" class="${avatarClass}" style="width:100%;height:100%;object-fit:cover;">` : 
+                        `<div class="video-avatar-initial ${avatarClass}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
+                    
+                    const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
+
+                    html += `
+                        <div class="video-card">
+                            <video class="video-player" data-src="${getOptimizedVideoUrl(vid.video_url)}" poster="${posterUrl}" loop playsinline preload="none" id="vid_${vid.id}"></video>
+                            <div class="insta-buffer" id="buf_${vid.id}"></div>
+                            <div class="center-play-btn" id="playBtn_${vid.id}"><i class="fas fa-play"></i></div>
+
+                            <div class="right-sidebar">
+                                <div class="video-avatar-container" onclick="viewUserProfile('${vid.userId}', '${safeStr(vid.username)}', '${vid.userPic}', '${safeStr(vid.bio)}', '${vid.verification}')">
+                                    ${avatarContent}
+                                </div>
+                                <div class="action-btn" id="likeBtn_${vid.id}" onclick="toggleLike('${vid.id}')">
+                                    <i class="fas fa-heart"></i>
+                                    <span id="likeCount_${vid.id}">${vid.likes_count || 0}</span>
+                                </div>
+                                <div class="action-btn">
+                                    <i class="fas fa-eye"></i>
+                                    <span>${vid.views_count || 0}</span>
+                                </div>
+                                <div class="action-btn" onclick="openComments('${vid.id}')">
+                                    <i class="fas fa-comment-dots"></i>
+                                    <span id="cmtCount_${vid.id}">${vid.comment_count || 0}</span>
+                                </div>
+                                <div class="action-btn ${isSaved ? 'saved' : ''}" id="saveBtn_${vid.id}" onclick="toggleSave('${vid.id}')">
+                                    <i class="fas fa-bookmark"></i>
+                                    <span>Save</span>
+                                </div>
+                                <div class="action-btn" onclick="openGiftModal('${vid.userId}')">
+                                    <i class="fas fa-gift" style="color:var(--primary);"></i>
+                                    <span>Gift</span>
+                                </div>
+                                <!-- NEW DOWNLOAD BUTTON START -->
+                                <div class="action-btn" onclick="downloadVideo('${getOptimizedVideoUrl(vid.video_url)}', '${vid.id}')">
+                                    <i class="fas fa-download"></i>
+                                    <span>Download</span>
+                                </div>
+                                <!-- NEW DOWNLOAD BUTTON END -->
+                            </div>
+
+                            <div class="video-overlay">
+                                <h3 onclick="viewUserProfile('${vid.userId}', '${safeStr(vid.username)}', '${vid.userPic}', '${safeStr(vid.bio)}', '${vid.verification}')">@${safeStr(vid.username) || 'user'} ${badge}</h3>
+                                <div style="margin-bottom: 5px;">${getFollowBtnHtml(vid.userId)}</div>
+                                <p>${safeStr(vid.caption) || ''}</p>
+                            </div>
+                            <div class="video-progress-container" onclick="seekVideo(event, this)">
+                                <div class="video-progress-bar"></div>
+                            </div>
+                        </div>`;
+                });
+                html += `</div>`;
+                contentDiv.innerHTML = html;
+                setupVideoListeners();
+                initObserver();
+            };
+
+            // 3. New Video Download Logic
+            window.downloadVideo = async function(videoUrl, videoId) {
+                showToast("Downloading...");
+                try {
+                    const response = await fetch(videoUrl);
+                    if (!response.ok) throw new Error("Network response was not ok");
+                    const blob = await response.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = `pikko_shorts_${videoId}.mp4`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    URL.revokeObjectURL(blobUrl);
+                    showToast("Download Complete!");
+                } catch (error) {
+                    showToast("Download Failed. Try again.");
+                }
+            };
+        })();
+    </script>
+    <!-- ======================================================== -->
+    <!-- MEGA UPDATE: EXPLORE PAGE, LEADERBOARD, AUTO RULES & FIXES -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // 1. Overriding Explore Page Layout
+            window.renderExplore = function() {
+                updateNavActive(1); 
+                pauseAllVideos();
+                
+                contentDiv.innerHTML = `
+                    <div class="search-bar" style="border-bottom: 1px solid var(--border);">
+                        <div style="flex:1; display:flex; align-items:center; background:var(--input-bg); border-radius:20px; padding:0 15px;">
+                            <input type="text" id="exploreSearchInputActual" placeholder="Search creators..." style="flex:1; background:transparent; border:none; color:white; outline:none; padding:12px 0;" onclick="openSearchOverlay()" readonly>
+                            <i class="fas fa-search" style="color:var(--primary); cursor:pointer;"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- NEW WELCOME BANNER -->
+                    <div style="margin: 15px; border-radius: 12px; background: linear-gradient(135deg, var(--primary), #FFA500); padding: 20px; text-align: center; color: #000; font-weight: bold; box-shadow: 0 4px 15px rgba(255,215,0,0.3);">
+                        <h2 style="margin: 0; font-size: 20px;">Welcome to Pikko Shorts</h2>
+                        <p style="font-size: 13px; margin-top: 5px;">Discover the best creators & trends</p>
+                    </div>
+                    
+                    <!-- NEW HORIZONTAL CARD (3 OPTIONS) -->
+                    <div style="margin: 0 15px 15px 15px; display: flex; background: var(--input-bg); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+                        <div style="flex: 1; text-align: center; padding: 15px 5px; cursor: pointer; border-right: 1px solid var(--border);" onclick="openLeaderboard()">
+                            <i class="fas fa-trophy" style="font-size: 26px; color: #FFD700; margin-bottom: 8px;"></i>
+                            <div style="font-size: 13px; font-weight: bold; color: #fff;">Leaderboard</div>
+                        </div>
+                        <div style="flex: 1; text-align: center; padding: 15px 5px; cursor: pointer; border-right: 1px solid var(--border);" onclick="requireAuth(() => openModal('verifyModal'))">
+                            <i class="fas fa-check-circle" style="font-size: 26px; color: #1DA1F2; margin-bottom: 8px;"></i>
+                            <div style="font-size: 13px; font-weight: bold; color: #fff;">Verification</div>
+                        </div>
+                        <div style="flex: 1; text-align: center; padding: 15px 5px; cursor: pointer;" onclick="showToast('New Events are coming soon!')">
+                            <i class="fas fa-calendar-alt" style="font-size: 26px; color: #e91e63; margin-bottom: 8px;"></i>
+                            <div style="font-size: 13px; font-weight: bold; color: #fff;">Events</div>
+                        </div>
+                    </div>
+
+                    <div class="section-title" style="padding-top: 5px;">Popular Videos</div>
+                    <div class="explore-grid-container" id="exploreGridContainer">
+                        <div class="explore-grid" id="exploreFeed">
+                            ${Array(9).fill(0).map(() => `<div class="grid-item" style="background:#111; aspect-ratio:9/16;"><div style="width:100%;height:100%;background:linear-gradient(135deg,#1a1a1a,#2a2a2a); animation: shimmer 1.5s infinite;"></div></div>`).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                db.collection('videos').orderBy('likes_count', 'desc').limit(9).get().then(snapshot => {
+                    const feed = document.getElementById('exploreFeed'); feed.innerHTML = '';
+                    snapshot.forEach(doc => {
+                        const vid = doc.data();
+                        const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
+                        feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                    });
+                }).catch(err => { console.log(err); });
+            };
+
+            // 2. Inject Leaderboard HTML Elements (With "No Tick" Option)
+            const leaderBoardHTML = `
+                <div id="leaderboardPage" class="full-screen-page" style="z-index: 2700; background:var(--bg);">
+                    <div class="header-bar">
+                        <i class="fas fa-arrow-left" onclick="closeLeaderboard()"></i>
+                        <h2>Top Creators</h2>
+                        <div onclick="openLBRules()" style="background:var(--input-bg); padding:5px 10px; border-radius:20px; font-size:12px; color:var(--primary); cursor:pointer; border:1px solid var(--primary);">
+                            <i class="fas fa-scroll"></i> Rules
+                        </div>
+                    </div>
+                    
+                    <div class="wallet-tabs" style="display:flex; justify-content:space-around; background:#1a1a1a; padding:10px 0; margin-bottom: 0;">
+                        <div class="wallet-tab active" onclick="switchLBTab('none', this)" style="flex:1;"><i class="fas fa-user" style="font-size:18px; color:#aaa;"></i><br><span style="font-size:12px;">No Tick</span></div>
+                        <div class="wallet-tab" onclick="switchLBTab('white', this)" style="flex:1;"><i class="fas fa-check-circle badge-white" style="font-size:18px;"></i><br><span style="font-size:12px;">White</span></div>
+                        <div class="wallet-tab" onclick="switchLBTab('blue', this)" style="flex:1;"><i class="fas fa-check-circle badge-blue" style="font-size:18px;"></i><br><span style="font-size:12px;">Blue</span></div>
+                        <div class="wallet-tab" onclick="switchLBTab('golden', this)" style="flex:1;"><i class="fas fa-check-circle badge-golden" style="font-size:18px;"></i><br><span style="font-size:12px;">Golden</span></div>
+                    </div>
+                    
+                    <div class="full-content" id="lbContent" style="padding: 15px; overflow-y:auto; flex:1;"></div>
+                </div>
+
+                <div id="lbRulesModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'" style="z-index: 2800;">
+                    <div class="bottom-modal" style="max-height:85vh; overflow-y:auto; background:var(--secondary-bg);">
+                        <div class="modal-header">
+                            <h3 style="color:var(--primary);"><i class="fas fa-balance-scale"></i> Leaderboard Rules</h3>
+                            <i class="fas fa-times" onclick="document.getElementById('lbRulesModal').style.display='none'"></i>
+                        </div>
+                        <div style="font-size:14px; color:#ccc; line-height:1.6; text-align:left;">
+                            <p style="color:#fff; font-weight:bold; margin-top:10px; border-bottom:1px solid #444; padding-bottom:5px;">বাংলা নিয়মাবলী (Bengali):</p>
+                            <ul style="padding-left: 20px; margin-top: 10px;">
+                                <li style="margin-bottom:8px;"><b>আপগ্রেড (No Tick):</b> নন-ভেরিফাইড (No Tick) ক্যাটাগরিতে ১ম স্থান অর্জনকারী স্বয়ংক্রিয়ভাবে হোয়াইট টিক পাবে।</li>
+                                <li style="margin-bottom:8px;"><b>আপগ্রেড:</b> ব্লু টিকে ১ম স্থান অর্জনকারী পরের মাসে স্বয়ংক্রিয়ভাবে <span style="color:gold;">গোল্ডেন টিক</span> ও 1000 pCoins পাবে।</li>
+                                <li style="margin-bottom:8px;"><b>আপগ্রেড:</b> হোয়াইট টিকে ১ম ও ২য় স্থান অর্জনকারী পরের মাসে <span style="color:#1DA1F2;">ব্লু টিক</span> পাবে।</li>
+                                <li style="margin-bottom:8px;"><b>ডাউনগ্রেড (No Tick):</b> এক মাসে ৫টির কম ভিডিও আপলোড করলে পেনাল্টি মেসেজ আসবে।</li>
+                                <li style="margin-bottom:8px;"><b>ডাউনগ্রেড (White):</b> এক মাসে ১০টির কম ভিডিও আপলোড করলে হোয়াইট টিক বাতিল হবে।</li>
+                                <li style="margin-bottom:8px;"><b>ডাউনগ্রেড (Blue):</b> এক মাসে ৩০টির কম ভিডিও অথবা ১০০ এর কম pCoins অর্জন করলে ব্লু টিক বাতিল হয়ে হোয়াইট টিক হবে।</li>
+                                <li style="margin-bottom:8px;"><b>ডাউনগ্রেড (Golden):</b> প্রতিমাসে সাবস্ক্রিপশন না থাকলে অথবা ৫০০০ এর কম pCoins অর্জন করলে গোল্ডেন টিক এবং মনিটাইজেশন বাতিল হবে।</li>
+                            </ul>
+
+                            <p style="color:#fff; font-weight:bold; margin-top:20px; border-bottom:1px solid #444; padding-bottom:5px;">English Rules:</p>
+                            <ul style="padding-left: 20px; margin-top: 10px;">
+                                <li style="margin-bottom:8px;"><b>No Tick 1st Place:</b> Automatically upgrades to White Tick next month.</li>
+                                <li style="margin-bottom:8px;"><b>Blue Tick 1st Place:</b> Automatically upgrades to Golden Tick + 1000 pCoins next month.</li>
+                                <li style="margin-bottom:8px;"><b>White Tick 1st & 2nd Place:</b> Automatically upgrades to Blue Tick next month.</li>
+                                <li style="margin-bottom:8px;"><b>No Tick Penalty:</b> Warning if < 5 videos uploaded.</li>
+                                <li style="margin-bottom:8px;"><b>White Penalty:</b> Loses tick if < 10 videos uploaded in a month.</li>
+                                <li style="margin-bottom:8px;"><b>Blue Penalty:</b> Downgrades to White if < 30 videos OR < 100 pCoins earned.</li>
+                                <li style="margin-bottom:8px;"><b>Golden Penalty:</b> Loses Golden tick & Monetization if < 5000 pCoins earned or subscription missed.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', leaderBoardHTML);
+
+            // 3. Leaderboard Functions (INDEX ERROR FIXED & NO TICK ADDED)
+            window.openLeaderboard = function() {
+                requireAuth(() => {
+                    document.getElementById('leaderboardPage').style.display = 'flex';
+                    switchLBTab('none', document.querySelector('#leaderboardPage .wallet-tab'));
+                    applyMonthlyAutoRules(); 
+                });
+            };
+            window.closeLeaderboard = function() { document.getElementById('leaderboardPage').style.display = 'none'; };
+            window.openLBRules = function() { document.getElementById('lbRulesModal').style.display = 'flex'; };
+            
+            window.switchLBTab = function(type, el) {
+                document.querySelectorAll('#leaderboardPage .wallet-tab').forEach(t => t.classList.remove('active'));
+                el.classList.add('active');
+                
+                const container = document.getElementById('lbContent');
+                container.innerHTML = '<div style="text-align:center; padding-top:50px;"><i class="fas fa-spinner fa-spin" style="font-size:40px; color:var(--primary);"></i><p style="margin-top:10px;">Loading Rankings...</p></div>';
+                
+                // লোকালি সর্ট করা হচ্ছে যাতে Composite Index Error না আসে
+                db.collection('users').where('verification', '==', type).get().then(snap => {
+                    container.innerHTML = '';
+                    if(snap.empty) {
+                        container.innerHTML = `<p style="text-align:center; padding-top:50px; color:#888;">No creators found for this tier yet.</p>`;
+                        return;
+                    }
+                    
+                    let usersArray = [];
+                    snap.forEach(doc => { usersArray.push({ id: doc.id, ...doc.data() }); });
+                    
+                    // স্টার (earnedCoins) অনুযায়ী বেশি থেকে কম সাজানো
+                    usersArray.sort((a, b) => (b.earnedCoins || 0) - (a.earnedCoins || 0));
+                    
+                    let rank = 1;
+                    usersArray.forEach(u => {
+                        let badge = getVerificationBadge(type);
+                        let initial = u.username ? safeStr(u.username).charAt(0).toUpperCase() : 'U';
+                        let avatar = (u.profilePic && u.profilePic.includes('http')) ? 
+                            `<img src="${u.profilePic}" style="width:45px;height:45px;border-radius:50%;object-fit:cover; border:2px solid ${rank===1?'gold':(rank===2?'silver':'transparent')};">` : 
+                            `<div style="width:45px;height:45px;border-radius:50%;background:var(--primary);color:#000;display:flex;align-items:center;justify-content:center;font-weight:bold; font-size:18px;">${initial}</div>`;
+                        
+                        let rankStyle = rank===1 ? 'color:gold; font-size:24px;' : (rank===2 ? 'color:silver; font-size:22px;' : (rank===3 ? 'color:#cd7f32; font-size:20px;' : 'color:#888; font-size:16px;'));
+                        let rankIcon = rank <= 3 ? '<i class="fas fa-crown"></i>' : `#${rank}`;
+
+                        container.innerHTML += `
+                            <div style="display:flex; align-items:center; background:var(--input-bg); padding:12px; border-radius:12px; margin-bottom:12px; border:1px solid ${rank===1?'rgba(255,215,0,0.3)':'var(--border)'}; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+                                <div style="width:40px; text-align:center; font-weight:bold; ${rankStyle}">${rankIcon}</div>
+                                <div style="margin:0 12px; cursor:pointer;" onclick="viewUserProfile('${u.id}', '${safeStr(u.username)}', '${u.profilePic}', '${safeStr(u.bio)}', '${u.verification}')">${avatar}</div>
+                                <div style="flex:1;">
+                                    <div style="font-weight:bold; font-size:16px;">@${safeStr(u.username)} ${badge}</div>
+                                    <div style="font-size:12px; color:var(--primary); margin-top:3px;"><i class="fas fa-star"></i> Stars: ${u.earnedCoins || 0}</div>
+                                </div>
+                            </div>
+                        `;
+                        rank++;
+                    });
+                }).catch(err => {
+                    container.innerHTML = `<p style="text-align:center; padding:20px; color:red;">Failed to load leaderboard data.</p>`;
+                });
+            };
+
+            // 4. Monthly Auto Rules Engine (100% Functional with Index Fix)
+            window.applyMonthlyAutoRules = function() {
+                let u = getUserData();
+                if(!u) return;
+
+                let currentMonthYear = new Date().getMonth() + "-" + new Date().getFullYear();
+                let lastChecked = localStorage.getItem('pikko_rules_checked');
+                
+                // মাসে একবার চেক করবে
+                if(lastChecked === currentMonthYear) return; 
+
+                let updates = {};
+                let changed = false;
+                let msg = "";
+                let monthlyVids = u.videos || 0; 
+                let monthlyCoins = u.earnedCoins || 0;
+
+                // Step 1: Check Downgrade Penalties
+                if(u.verification === 'golden') {
+                    if(monthlyCoins < 5000) {
+                        updates.verification = 'blue'; changed = true; 
+                        msg = "Alert: Your Golden Tick and Monetization were removed due to low monthly performance/recharge.";
+                    }
+                } else if (u.verification === 'blue') {
+                    if(monthlyVids < 30 || monthlyCoins < 100) {
+                        updates.verification = 'white'; changed = true;
+                        msg = "Alert: Your Blue Tick was downgraded to White Tick due to less than 30 videos or 100 pCoins.";
+                    }
+                } else if (u.verification === 'white') {
+                    if(monthlyVids < 10) {
+                        updates.verification = 'none'; changed = true;
+                        msg = "Alert: Your White Tick was removed due to uploading less than 10 videos this month.";
+                    }
+                } else if (u.verification === 'none' || !u.verification) {
+                    if(monthlyVids < 5) {
+                        msg = "Warning: You uploaded less than 5 videos this month. Keep uploading to stay on the leaderboard!";
+                    }
+                }
+
+                // Step 2: Check Upgrade Rewards (Only if not penalized)
+                if(!changed) {
+                    db.collection('users').where('verification', '==', (u.verification || 'none')).get().then(snap => {
+                        let usersArray = [];
+                        snap.forEach(doc => usersArray.push({ id: doc.id, ...doc.data() }));
+                        usersArray.sort((a, b) => (b.earnedCoins || 0) - (a.earnedCoins || 0));
+                        
+                        let myRank = usersArray.findIndex(user => user.id === u.id) + 1;
+                        
+                        if(myRank > 0) {
+                            if(u.verification === 'blue' && myRank === 1) {
+                                updates.verification = 'golden';
+                                updates.pCoins = firebase.firestore.FieldValue.increment(1000);
+                                changed = true; msg = "Congratulations! You ranked 1st in Blue Tick. Upgraded to Golden Tick + 1000 pCoins!";
+                            } else if(u.verification === 'white' && (myRank === 1 || myRank === 2)) {
+                                updates.verification = 'blue';
+                                changed = true; msg = `Congratulations! You ranked ${myRank} in White Tick. Upgraded to Blue Tick!`;
+                            } else if((u.verification === 'none' || !u.verification) && myRank === 1) {
+                                updates.verification = 'white';
+                                changed = true; msg = `Congratulations! You ranked 1st in the Normal Category. Upgraded to White Tick!`;
+                            }
+                        }
+
+                        // Apply Changes
+                        if(changed || msg) applyTickChanges(u, updates, msg);
+                        localStorage.setItem('pikko_rules_checked', currentMonthYear);
+                    });
+                } else {
+                    if(changed || msg) applyTickChanges(u, updates, msg);
+                    localStorage.setItem('pikko_rules_checked', currentMonthYear);
+                }
+            };
+
+            function applyTickChanges(u, updates, msg) {
+                if(Object.keys(updates).length > 0) {
+                    db.collection('users').doc(u.id).update(updates).then(() => {
+                        if(updates.verification) {
+                            u.verification = updates.verification;
+                            if(updates.pCoins) u.pCoins = (u.pCoins || 0) + 1000;
+                            saveUserData(u);
+                            
+                            db.collection('videos').where('userId', '==', u.id).get().then(snap => {
+                                snap.forEach(v => { v.ref.update({ verification: updates.verification }); });
+                            });
+                            localStorage.removeItem('pikko_video_cache');
+                        }
+                        if(msg) showToast(msg);
+                    });
+                } else if(msg) {
+                    showToast(msg);
+                }
+            }
+        })();
+    </script>
+    <!-- ======================================================== -->
+    <!-- MEGA UPDATE: ADMIN USER MANAGEMENT & BAN/UNBAN SYSTEM -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // 1. অ্যাডমিন প্যানেলে নতুন বাটন যুক্ত করা এবং পুরনোগুলো ফিক্স করা
+            const checkAdminInterval = setInterval(() => {
+                const adminGrid = document.querySelector('#adminPanelModal .full-content div:first-child');
+                if(adminGrid && !document.getElementById('adminAllUsersBtn')) {
+                    
+                    // আগের ব্যান বাটন ফিক্স করা
+                    const banBtn = adminGrid.querySelector('.fa-user-slash').parentElement;
+                    banBtn.onclick = () => loadAdminBanUnban();
+                    banBtn.querySelector('span').innerText = "Ban / Unban";
+
+                    // নতুন All Users বাটন তৈরি করা
+                    const userListBtn = document.createElement('div');
+                    userListBtn.id = 'adminAllUsersBtn';
+                    userListBtn.className = 'action-btn';
+                    userListBtn.style.cssText = 'background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333; cursor:pointer;';
+                    userListBtn.innerHTML = '<i class="fas fa-users" style="color:#9C27B0; font-size:24px; margin-bottom:5px;"></i><span>All Users</span>';
+                    userListBtn.onclick = () => loadAdminUsers();
+                    
+                    adminGrid.appendChild(userListBtn);
+                    clearInterval(checkAdminInterval);
+                }
+            }, 1000);
+
+            // 2. সব ইউজারের লিস্ট দেখা এবং ডিলিট করার ফাংশন
+            window.loadAdminUsers = function() {
+                document.getElementById('adminSectionTitle').innerText = 'All Registered Users';
+                let log = document.getElementById('adminActivityLog');
+                log.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size:30px; color:var(--primary);"></i><br><br>Loading Users...</div>';
+
+                db.collection('users').get().then(snap => {
+                    log.innerHTML = '';
+                    if(snap.empty) { log.innerHTML = '<p style="text-align:center; color:#888;">No users found.</p>'; return; }
+                    
+                    snap.forEach(doc => {
+                        let u = doc.data();
+                        let initial = u.username ? safeStr(u.username).charAt(0).toUpperCase() : 'U';
+                        let avatar = (u.profilePic && u.profilePic.includes('http')) ? 
+                            `<img src="${u.profilePic}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">` : 
+                            `<div style="width:40px;height:40px;border-radius:50%;background:var(--primary);color:#000;display:flex;align-items:center;justify-content:center;font-weight:bold;">${initial}</div>`;
+
+                        log.innerHTML += `
+                            <div style="background:var(--input-bg); padding:12px; border-radius:10px; margin-bottom:10px; border:1px solid #333; display:flex; justify-content:space-between; align-items:center;">
+                                <div style="display:flex; align-items:center; gap:10px;">
+                                    ${avatar}
+                                    <div>
+                                        <div style="font-weight:bold; font-size:15px;">@${safeStr(u.username)}</div>
+                                        <div style="font-size:11px; color:var(--primary);">Coins: ${u.pCoins || 0} | Views: ${u.totalViews || 0}</div>
+                                    </div>
+                                </div>
+                                <button style="background:#F44336; color:#fff; border:none; padding:8px 12px; border-radius:5px; cursor:pointer; box-shadow: 0 2px 5px rgba(244,67,54,0.4);" onclick="deleteAppUser('${doc.id}', '${safeStr(u.username)}')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                });
+            };
+
+            // ইউজার ডিলিট করা
+            window.deleteAppUser = function(userId, username) {
+                if(confirm(`আপনি কি সত্যিই @${username} কে ডিলিট করতে চান? এই কাজ রিকভার করা যাবে না!`)) {
+                    db.collection('users').doc(userId).delete().then(() => {
+                        showToast("User deleted successfully!");
+                        loadAdminUsers(); // লিস্ট রিফ্রেশ করবে
+                    }).catch(err => {
+                        showToast("Error deleting user.");
+                    });
+                }
+            };
+
+            // 3. Ban / Unban সার্চ সিস্টেম
+            window.loadAdminBanUnban = function() {
+                document.getElementById('adminSectionTitle').innerText = 'Ban / Unban User';
+                let log = document.getElementById('adminActivityLog');
+                
+                log.innerHTML = `
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="banSearchInput" class="custom-input" placeholder="Enter exactly Username (without @)" style="margin:0; flex:1;">
+                        <button class="primary-btn" style="width:auto; padding:10px 20px; background:var(--primary); color:#000;" onclick="searchUserForBan()"><i class="fas fa-search"></i></button>
+                    </div>
+                    <div id="banSearchResult" style="margin-top:20px;"></div>
+                `;
+            };
+
+            window.searchUserForBan = function() {
+                let uname = document.getElementById('banSearchInput').value.trim();
+                if(!uname) return showToast("একটি ইউজারনেম লিখুন");
+                
+                let resDiv = document.getElementById('banSearchResult');
+                resDiv.innerHTML = '<div style="text-align:center;"><i class="fas fa-spinner fa-spin" style="font-size:30px; color:var(--primary);"></i><br><br>Searching...</div>';
+                
+                db.collection('users').where('username', '==', uname).get().then(snap => {
+                    if(snap.empty) { resDiv.innerHTML = '<p style="color:#F44336; text-align:center; font-weight:bold;">User not found!</p>'; return; }
+                    
+                    resDiv.innerHTML = '';
+                    snap.forEach(doc => {
+                        let u = doc.data();
+                        let isBanned = u.isBanned || false;
+                        let btnColor = isBanned ? '#4CAF50' : '#F44336';
+                        let btnText = isBanned ? '<i class="fas fa-unlock"></i> Unban User' : '<i class="fas fa-ban"></i> Ban User';
+                        let avatar = u.profilePic || 'https://via.placeholder.com/100';
+
+                        resDiv.innerHTML += `
+                            <div style="background:var(--input-bg); padding:20px; border-radius:15px; border:1px solid #333; text-align:center; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">
+                                <img src="${avatar}" style="width:80px; height:80px; border-radius:50%; object-fit:cover; border:2px solid ${isBanned ? 'red' : 'green'}; margin-bottom:10px;">
+                                <div style="font-weight:bold; font-size:22px;">@${safeStr(u.username)}</div>
+                                <div style="font-size:14px; color:${isBanned ? '#F44336' : '#4CAF50'}; margin-bottom:20px; font-weight:bold; text-transform:uppercase;">Status: ${isBanned ? 'BANNED' : 'ACTIVE'}</div>
+                                
+                                <button style="background:${btnColor}; color:#fff; border:none; padding:12px 25px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;" onclick="toggleBanStatus('${doc.id}', ${isBanned})">${btnText}</button>
+                            </div>
+                        `;
+                    });
+                });
+            };
+
+            window.toggleBanStatus = function(userId, currentStatus) {
+                let newStatus = !currentStatus;
+                db.collection('users').doc(userId).update({ isBanned: newStatus }).then(() => {
+                    showToast(newStatus ? "User has been Banned!" : "User Unbanned successfully!");
+                    searchUserForBan(); 
+                });
+            };
+
+            // 4. ব্যান হওয়া ইউজারদের অ্যাপ থেকে বের করে দেওয়ার সিকিউরিটি চেক
+            const originalGetUserDataForBan = window.getUserData;
+            window.getUserData = function() {
+                let u = originalGetUserDataForBan();
+                if(u && u.id) {
+                    db.collection('users').doc(u.id).get().then(doc => {
+                        if(doc.exists && doc.data().isBanned) {
+                            alert("Your account has been banned by the Administrator due to policy violation.");
+                            localStorage.removeItem('pikko_user');
+                            window.location.reload();
+                        }
+                    }).catch(e=>{});
+                }
+                return u;
+            };
+
+        })();
+    </script>
+      <!-- ======================================================== -->
+    <!-- MEGA UPDATE: PROFESSIONAL UI ALERTS, BAN LETTER & TOASTS -->
+    <!-- ======================================================== -->
+    <style>
+        /* 1. Pro Toast Notification Styles */
+        #proToastContainer { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 9999999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; width: 90%; max-width: 350px; }
+        .pro-toast { background: #1a1a1a; border-left: 4px solid var(--primary); color: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: bold; animation: slideDownToast 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards, fadeOutToast 0.4s ease 2.6s forwards; border-right: 1px solid #333; border-top: 1px solid #333; border-bottom: 1px solid #333; }
+        .pro-toast.success { border-left-color: #4CAF50; }
+        .pro-toast.error { border-left-color: #F44336; }
+        .pro-toast.warning { border-left-color: #FF9800; }
+        .pro-toast i { font-size: 20px; }
+        @keyframes slideDownToast { from { transform: translateY(-30px) scale(0.9); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+        @keyframes fadeOutToast { to { opacity: 0; transform: translateY(-10px); } }
+
+        /* 2. Professional Ban Screen (Formal Letter Style) */
+        #proBanScreen { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 99999999; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(10px); }
+        .ban-letter { background: linear-gradient(145deg, #111, #1a1a1a); border: 1px solid #333; border-top: 6px solid #F44336; padding: 35px 25px; border-radius: 16px; max-width: 380px; text-align: center; box-shadow: 0 15px 40px rgba(244,67,54,0.3); position: relative; overflow: hidden; }
+        .ban-letter::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(244,67,54,0.1) 0%, transparent 60%); pointer-events: none; }
+        
+        /* 3. Custom Admin Confirm Modal */
+        #proConfirmModal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); z-index: 9999999; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(5px); }
+        .confirm-card { background: #1a1a1a; padding: 30px 25px; border-radius: 16px; border: 1px solid #333; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 15px 35px rgba(0,0,0,0.6); animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    </style>
+
+    <!-- HTML Elements for Modals & Toasts -->
+    <div id="proToastContainer"></div>
+
+    <div id="proBanScreen">
+        <div class="ban-letter">
+            <i class="fas fa-user-slash" style="font-size: 55px; color: #F44336; margin-bottom: 15px; text-shadow: 0 0 15px rgba(244,67,54,0.5);"></i>
+            <h2 style="color: #fff; margin-bottom: 12px; font-size: 24px; letter-spacing: 1px;">Account Suspended</h2>
+            <p style="color: #bbb; font-size: 14px; line-height: 1.6; margin-bottom: 25px; text-align: justify;">
+                Dear User,<br><br>
+                We regret to inform you that your account has been <b>strictly suspended</b> by the Pikko Shorts Administration due to severe violations of our community guidelines and policies. <br><br>
+                Access to the platform is currently restricted for this identity.
+            </p>
+            <button onclick="executeBanLogout()" style="background: linear-gradient(90deg, #F44336, #D32F2F); color: #fff; border: none; padding: 14px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; width: 100%; box-shadow: 0 4px 15px rgba(244,67,54,0.4);">Acknowledge & Logout</button>
+        </div>
+    </div>
+
+    <div id="proConfirmModal">
+        <div class="confirm-card">
+            <i class="fas fa-exclamation-triangle" style="font-size: 45px; color: #FF9800; margin-bottom: 15px; text-shadow: 0 0 15px rgba(255,152,0,0.5);"></i>
+            <h3 id="confirmTitle" style="color:#fff; margin-bottom:10px; font-size:20px;">Are you absolutely sure?</h3>
+            <p id="confirmDesc" style="color:#aaa; font-size:13px; margin-bottom:25px;">This action cannot be undone. Data will be permanently lost.</p>
+            <div style="display:flex; gap:12px; justify-content:center;">
+                <button onclick="document.getElementById('proConfirmModal').style.display='none'" style="flex:1; background:#333; color:#fff; border:1px solid #555; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer;">Cancel</button>
+                <button id="confirmYesBtn" style="flex:1; background:linear-gradient(90deg, #F44336, #C62828); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow: 0 4px 10px rgba(244,67,54,0.3);">Yes, Delete!</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // 1. OVERRIDE GLOBAL TOAST FUNCTION
+            // Type can be: 'success', 'error', 'warning', 'info' (default)
+            window.showToast = function(msg, type = 'info') {
+                const container = document.getElementById('proToastContainer');
+                const toast = document.createElement('div');
+                toast.className = `pro-toast ${type}`;
+                
+                let iconClass = 'fa-info-circle';
+                if(type === 'success') iconClass = 'fa-check-circle';
+                if(type === 'error') iconClass = 'fa-times-circle';
+                if(type === 'warning') iconClass = 'fa-exclamation-triangle';
+
+                toast.innerHTML = `<i class="fas ${iconClass}"></i> <span>${msg}</span>`;
+                container.appendChild(toast);
+                
+                // ডিফল্ট পুরানো টোস্ট হাইড করে রাখা হলো
+                const oldToast = document.getElementById('toastMessage');
+                if(oldToast) oldToast.style.display = 'none';
+
+                // ৩ সেকেন্ড পর টোস্ট রিমুভ হবে
+                setTimeout(() => { if(toast.parentNode) toast.remove(); }, 3000);
+            };
+
+            // 2. CUSTOM ACTION CARD FOR ADMIN
+            window.showProConfirm = function(title, desc, onConfirmCallback) {
+                document.getElementById('confirmTitle').innerText = title;
+                document.getElementById('confirmDesc').innerText = desc;
+                const modal = document.getElementById('proConfirmModal');
+                const yesBtn = document.getElementById('confirmYesBtn');
+                
+                modal.style.display = 'flex';
+                yesBtn.onclick = function() {
+                    modal.style.display = 'none';
+                    if(onConfirmCallback) onConfirmCallback();
+                };
+            };
+
+            // ওভাররাইড: অ্যাডমিন প্যানেল থেকে ইউজার ডিলিটের ফাংশন
+            window.deleteAppUser = function(userId, username) {
+                // ডিফল্ট confirm() এর বদলে আমাদের প্রফেশনাল অ্যাকশন কার্ড ব্যবহার করা হলো
+                showProConfirm(
+                    `Delete @${username}?`, 
+                    `This will permanently remove the user from Pikko Shorts database.`, 
+                    () => {
+                        db.collection('users').doc(userId).delete().then(() => {
+                            showToast("User deleted successfully!", "success");
+                            loadAdminUsers(); // লিস্ট রিফ্রেশ করবে
+                        }).catch(err => {
+                            showToast("Error deleting user.", "error");
+                        });
+                    }
+                );
+            };
+
+            // ওভাররাইড: টগল ব্যান স্ট্যাটাসের মেসেজ স্টাইল
+            window.toggleBanStatus = function(userId, currentStatus) {
+                let newStatus = !currentStatus;
+                db.collection('users').doc(userId).update({ isBanned: newStatus }).then(() => {
+                    if(newStatus) {
+                        showToast("User has been Banned!", "error");
+                    } else {
+                        showToast("User Unbanned successfully!", "success");
+                    }
+                    searchUserForBan(); 
+                });
+            };
+
+            // 3. OVERRIDE BAN CHECKER (FORMAL BAN LETTER SCREEN)
+            const originalGetUserDataForProBan = window.getUserData;
+            window.getUserData = function() {
+                let u = originalGetUserDataForProBan();
+                if(u && u.id) {
+                    db.collection('users').doc(u.id).get().then(doc => {
+                        if(doc.exists && doc.data().isBanned) {
+                            // বোরিং alert() এর বদলে সুন্দর লেটার স্টাইল স্ক্রিন ওপেন হবে
+                            document.getElementById('proBanScreen').style.display = 'flex';
+                            pauseAllVideos();
+                        }
+                    }).catch(e=>{});
+                }
+                return u;
+            };
+
+            window.executeBanLogout = function() {
+                localStorage.removeItem('pikko_user');
+                window.location.reload();
+            };
+
+        })();
+    </script>
 </body>
 </html>
