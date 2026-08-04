@@ -1,467 +1,2236 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="format-detection" content="telephone=no">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Pikko Shorts - Premium</title>
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- Additional Critical CSS to prevent white/black screen -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
-        /* Critical CSS - prevents layout shift and white screen */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
+        /* ===== RESET & BASE ===== */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+        [data-theme="dark"] {
+            --bg: #000000; --text: #ffffff; --card-bg: #000000; --border: #262626; --secondary-bg: #121212;
+            --input-bg: #1e1e1e; --muted-text: #8e8e8e; --nav-bg: #000000; --primary: #FFD700; --accent: #E50914;
+            --gradient-1: linear-gradient(135deg, #FFD700, #FFA500);
         }
+        body { background-color: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* ===== SPLASH SCREEN ===== */
+        #splashScreen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 99999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            animation: fadeOutSplash 0.5s ease 1.5s forwards;
+        }
+        .splash-logo { font-size: 60px; color: var(--primary); animation: pulseSplash 1s infinite alternate; text-shadow: 0 0 20px rgba(255, 215, 0, 0.6); }
+        .splash-text { font-size: 26px; font-weight: bold; margin-top: 15px; letter-spacing: 3px; color: #fff; }
+        @keyframes pulseSplash { 0% { transform: scale(0.9); opacity: 0.8; } 100% { transform: scale(1.1); opacity: 1; } }
+        @keyframes fadeOutSplash { to { opacity: 0; visibility: hidden; } }
+
+        /* ===== CORE LAYOUT ===== */
+        .content-area { flex: 1; position: relative; overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth; background: #000; padding-bottom: 60px; }
+        .video-feed { height: 100%; width: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+        .video-feed::-webkit-scrollbar { display: none; }
+        .video-card { height: 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; position: relative; background: #000; }
+        .video-player { width: 100%; height: 100%; object-fit: cover; background: #111 url('https://via.placeholder.com/400x800?text=Loading...') center center/cover no-repeat; }
+        video::-webkit-media-controls { display: none !important; }
+
+        /* ===== PRO SKELETON BLUR LOADER ===== */
+        .pro-skeleton { display: flex; flex-direction: column; width: 100%; height: 100vh; background: #000; position: relative; overflow: hidden; }
+        .pro-skeleton .sk-top { position: absolute; top: 20px; left: 0; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 10; }
+        .pro-skeleton .sk-top span { display: inline-block; height: 18px; width: 80px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); animation: shimmer 1.5s infinite; border-radius: 4px; }
+        .pro-skeleton .sk-avatar { position: absolute; right: 18px; bottom: 100px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+        .pro-skeleton .sk-avatar .circle { width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); animation: shimmer 1.5s infinite; }
+        .pro-skeleton .sk-avatar .rect { width: 40px; height: 12px; border-radius: 6px; background: rgba(255,255,255,0.1); animation: shimmer 1.5s infinite; }
+        .pro-skeleton .sk-bottom { position: absolute; bottom: 30px; left: 16px; display: flex; flex-direction: column; gap: 10px; width: 70%; }
+        .pro-skeleton .sk-bottom .line { height: 14px; border-radius: 4px; background: rgba(255,255,255,0.1); animation: shimmer 1.5s infinite; }
+        .pro-skeleton .sk-bottom .line.short { width: 50%; }
+        .pro-skeleton .blur-bg { position: absolute; width:100%; height:100%; background: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000 100%); animation: pulseBg 2s infinite; }
+        @keyframes shimmer { 0% { opacity: 0.3; } 50% { opacity: 0.7; } 100% { opacity: 0.3; } }
+        @keyframes pulseBg { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+        /* ===== VIDEO UI ===== */
+        .center-play-btn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 60px; color: rgba(255, 255, 255, 0.7); z-index: 60; pointer-events: none; text-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); display: none; }
+        .insta-buffer { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); background-size: 200% 100%; animation: bufferSlide 1s infinite linear; z-index: 100; display: none; }
+        @keyframes bufferSlide { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
         
-        body {
-            margin: 0;
-            padding: 0;
-            background: #000000;
-            min-height: 100vh;
-            overflow-x: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        }
+        .top-tabs-container { position: absolute; top: 20px; width: 100%; display: flex; justify-content: center; gap: 20px; z-index: 100; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8); }
+        .top-tab { font-size: 16px; font-weight: bold; color: rgba(255, 255, 255, 0.6); cursor: pointer; transition: 0.3s; }
+        .top-tab.active { color: #fff; border-bottom: 2px solid #fff; padding-bottom: 4px; }
+
+        .video-overlay { position: absolute; bottom: 20px; left: 15px; width: 75%; pointer-events: none; z-index: 10; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+        .video-overlay h3 { font-size: 16px; margin-bottom: 5px; font-weight: bold; color: #fff; pointer-events: auto; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+        .video-overlay p { font-size: 14px; line-height: 1.4; color: #fff; }
+
+        .follow-badge { background: transparent; color: white; border: 1px solid white; font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: bold; pointer-events: auto; cursor: pointer; display: inline-block; transition: 0.2s;}
+        .follow-badge.not-following { background: var(--accent); border-color: var(--accent); }
+
+        .right-sidebar { position: absolute; right: 10px; bottom: 30px; display: flex; flex-direction: column; gap: 18px; z-index: 20; align-items: center; }
+        .action-btn { display: flex; flex-direction: column; align-items: center; color: white; cursor: pointer; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); }
+        .action-btn i { font-size: 30px; transition: 0.2s; }
+        .action-btn.liked i { color: var(--accent); }
+        .action-btn.saved i { color: var(--primary); }
+        .action-btn span { font-size: 12px; font-weight: bold; margin-top: 3px; text-align: center; }
+
+        .video-avatar-container { position: relative; width: 45px; height: 45px; margin-bottom: 10px; cursor: pointer; pointer-events: auto; border-radius: 50%; border: 2px solid var(--primary); background: #333; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .video-avatar-container img { width: 100%; height: 100%; object-fit: cover; }
+        .video-avatar-initial { font-size: 20px; font-weight: bold; color: #fff; }
+
+        .video-progress-container { position: absolute; bottom: 0; left: 0; width: 100%; height: 3px; background: rgba(255, 255, 255, 0.2); z-index: 50; cursor: pointer; }
+        .video-progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear; }
+
+        /* ===== BOTTOM NAVIGATION ===== */
+        .bottom-nav { height: 60px; background: var(--nav-bg); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); position: fixed; bottom: 0; width: 100%; z-index: 1000; }
+        .nav-item { color: var(--muted-text); font-size: 22px; cursor: pointer; padding: 10px; transition: 0.3s; flex: 1; text-align: center; }
+        .nav-item.active { color: var(--primary); }
+        .upload-btn-wrapper { margin-top: -20px; }
+        .camera-btn-nav { background: var(--primary); color: var(--bg); width: 45px; height: 45px; margin: 0 auto; display: flex; justify-content: center; align-items: center; border-radius: 12px; font-size: 20px; font-weight: bold; border: 2px solid var(--bg); box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3); }
+
+        /* ===== PROFILE & SIDE MENU ===== */
+        .profile-header { padding: 20px; text-align: center; border-bottom: 1px solid var(--border); position: relative; }
+        .menu-icon-top-left { position: absolute; top: 20px; left: 20px; font-size: 24px; color: var(--text); cursor: pointer; }
+        .wallet-icon-top { position: absolute; top: 20px; right: 20px; font-size: 24px; color: var(--primary); cursor: pointer; }
         
-        #mainContent {
-            width: 100%;
-            height: 100%;
-            position: relative;
-            min-height: 100vh;
-        }
+        .side-menu { position: fixed; top: 0; left: -300px; width: 280px; height: 100vh; background: var(--secondary-bg); z-index: 6000; transition: left 0.3s ease; box-shadow: 2px 0 15px rgba(0,0,0,0.5); overflow-y: auto; display: flex; flex-direction: column;}
+        .side-menu.open { left: 0; }
+        .menu-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 5999; display: none; }
+        .menu-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .menu-header h2 { font-size: 18px; color: var(--primary); }
+        .menu-item { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; font-size: 16px; color: var(--text); cursor: pointer; transition: 0.2s; }
+        .menu-item:hover { background: var(--input-bg); }
+        .menu-item i { color: var(--muted-text); width: 20px; text-align: center; }
+
+        .profile-pic { width: 90px; height: 90px; border-radius: 50%; border: 2px solid var(--primary); margin: 0 auto 10px; background: #333; object-fit: cover; }
+        .profile-stats { display: flex; justify-content: center; gap: 30px; margin: 15px 0; }
+        .profile-stat-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+        .profile-stat-item strong { font-size: 18px; color: var(--text); font-weight: bold; }
+        .profile-stat-item span { font-size: 12px; color: var(--muted-text); }
+        .edit-profile-btn { background: var(--input-bg); color: white; border: 1px solid var(--border); border-radius: 8px; padding: 8px 0; width: 100%; max-width: 250px; font-weight: bold; font-size: 14px; cursor: pointer; margin: 0 auto; display: block; }
         
-        /* Hide scrollbar but keep functionality */
-        ::-webkit-scrollbar {
-            width: 0;
-            background: transparent;
-        }
+        .profile-tabs { display: flex; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+        .profile-tab { flex: 1; text-align: center; padding: 15px; color: var(--muted-text); font-size: 20px; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.2s; }
+        .profile-tab.active { color: var(--text); border-bottom: 2px solid var(--text); }
+        .profile-grid, .explore-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+        .grid-item { width: 100%; aspect-ratio: 9/16; background: #222; overflow: hidden; position: relative; cursor: pointer; }
+        .grid-item img { width: 100%; height: 100%; object-fit: cover; }
+        .grid-item-stats { position: absolute; bottom: 5px; left: 5px; color: white; font-size: 12px; font-weight: bold; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); display: flex; align-items: center; gap: 4px; }
+
+        /* ===== PROFESSIONAL WALLET UI ===== */
+        .wallet-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; position:relative; }
+        .wallet-tab { flex: 1; text-align: center; padding: 15px; color: #888; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; transition:0.3s; }
+        .wallet-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
         
-        /* WebView hardware acceleration fix */
-        .webview-fix {
-            transform: translate3d(0,0,0);
-            -webkit-transform: translate3d(0,0,0);
-            backface-visibility: hidden;
-            -webkit-backface-visibility: hidden;
-        }
+        .wallet-card-pro { background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%); border-radius: 16px; padding: 25px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.4); border: 1px solid #333; position: relative; overflow: hidden; margin-bottom: 15px; }
+        .recharge-pack-pro { background: rgba(30, 30, 30, 0.8); backdrop-filter: blur(10px); border: 1px solid #444; border-radius: 15px; padding: 20px; text-align: center; transition: 0.3s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: space-between; }
+        .pack-coins { font-size: 22px; font-weight: bold; color: var(--primary); margin-bottom: 5px; }
+        .pack-bonus { font-size: 11px; color: #4CAF50; margin-bottom: 15px; }
+
+        /* ===== PAYMENT CARD (PROFESSIONAL) ===== */
+        .payment-card-ui { background: linear-gradient(135deg, #111, #222); border-radius: 16px; padding: 25px; margin: 15px 0; position: relative; overflow: hidden; box-shadow: 0 15px 30px rgba(0,0,0,0.6); border: 1px solid #444; text-align: left; }
+        .card-chip { width: 45px; height: 35px; background: linear-gradient(135deg, #ffd700, #b8860b); border-radius: 6px; margin-bottom: 15px; display: inline-block; position: relative; overflow: hidden; }
+        .card-title { color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .card-amount { color: #fff; font-size: 36px; font-weight: bold; margin-bottom: 15px; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .upi-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; border: 1px dashed #555; display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+
+        /* ===== GENERAL UI ELEMENTS ===== */
+        .full-screen-page { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg); z-index: 2000; display: none; flex-direction: column; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; border-bottom: 1px solid var(--border); font-size: 18px; position: sticky; top: 0; background: var(--bg); z-index: 10; }
+        .full-content { padding: 20px; display: flex; flex-direction: column; gap: 15px; flex: 1; }
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 5000; display: none; justify-content: center; align-items: flex-end; }
+        .bottom-modal { background: var(--secondary-bg); width: 100%; border-radius: 22px 22px 0 0; padding: 20px; border-top: 1px solid var(--border); animation: slideUp 0.3s ease; max-height: 85vh; overflow-y: auto; display: flex; flex-direction: column; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 10px; }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         
-        /* Loading overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: #000000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            flex-direction: column;
-        }
+        .custom-input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); color: var(--text); padding: 15px; border-radius: 10px; font-size: 14px; outline: none; margin-bottom: 10px; transition: 0.3s; }
+        .custom-input:focus { border-color: var(--primary); }
+        .primary-btn { width: 100%; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; }
+        .primary-btn:active { transform: scale(0.98); }
+        .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255,255,255,0.2);
-            border-top-color: #fe2c55;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+        /* TOAST MESSAGE FIX */
+        .toast-message { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; padding: 12px 24px; border-radius: 30px; z-index: 999999 !important; display: none; font-size: 14px; font-weight: bold; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+
+        /* ===== PREMIUM / CREATOR HUB UI ===== */
+        .premium-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 3000; flex-direction: column; overflow-y: auto; color: #fff; }
+        .premium-header { padding: 15px 20px; background: #111; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 10; }
+        .premium-header h2 { font-size: 18px; color: var(--primary); margin: 0; }
+        .premium-content { padding: 20px; }
+        .veri-card { background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 20px; margin-bottom: 15px; position: relative; overflow: hidden; }
+        .veri-card.white { border-left: 4px solid #fff; }
+        .veri-card.blue { border-left: 4px solid #1DA1F2; }
+        .veri-card.golden { border-left: 4px solid #FFD700; background: linear-gradient(145deg, #1a1a1a, #2a2000); }
+        .veri-req { font-size: 13px; color: #aaa; margin-bottom: 15px; }
+        .veri-btn { background: #333; color: #fff; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; cursor: pointer; border: none; width: 100%; }
+        .veri-btn.active { background: linear-gradient(45deg, #FFD700, #FFA500); color: #000; }
         
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+        .history-item { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #222; background: var(--input-bg); border-radius: 10px; margin-bottom: 10px; }
+        .history-amt.positive { color: #4CAF50; font-weight: bold; }
+        .history-amt.negative { color: #F44336; font-weight: bold; }
+        .history-amt.pending { color: #FF9800; font-weight: bold; }
         
-        .loading-text {
-            color: white;
-            margin-top: 15px;
-            font-size: 14px;
-        }
+        /* Badges */
+        .badge-white { color: #fff; text-shadow: 0 0 5px rgba(255,255,255,0.8); margin-left: 5px; }
+        .badge-blue { color: #1DA1F2; text-shadow: 0 0 5px rgba(29,161,242,0.8); margin-left: 5px; }
+        .badge-golden { color: #FFD700; text-shadow: 0 0 8px rgba(255,215,0,0.9); margin-left: 5px; }
+        .vip-frame { border: 3px solid #FFD700; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
         
-        /* Toast message */
-        .toast-message {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 30px;
-            font-size: 14px;
-            z-index: 10000;
-            display: none;
-            backdrop-filter: blur(10px);
-            white-space: nowrap;
-        }
+        /* Floating Heart Animation */
+        @keyframes floatHeartAnim { 0% { transform: scale(0) translateY(0); opacity: 1; } 100% { transform: scale(1) translateY(-120px); opacity: 0; } }
+        .floating-heart { position: fixed; font-size: 65px; color: var(--accent); z-index: 1000; pointer-events: none; animation: floatHeartAnim 1s ease-out forwards; text-shadow: 0px 4px 10px rgba(0, 0, 0, 0.5); }
+
+        /* ===== CAMERA EXTENDED ===== */
+        #cameraModal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 4000; display: none; flex-direction: column; justify-content: space-between; align-items: center; }
+        .camera-top-controls { width: 100%; display: flex; justify-content: space-between; padding: 20px; color: #fff; font-size: 24px; cursor: pointer; z-index: 10; position: absolute; top: 0; }
+        .camera-shutter { width: 75px; height: 75px; border-radius: 50%; border: 4px solid var(--primary); display: flex; align-items: center; justify-content: center; cursor: pointer; background: rgba(255, 215, 0, 0.2); }
+        .camera-inner-btn { width: 55px; height: 55px; border-radius: 50%; background: #fff; transition: 0.3s; }
+        .camera-inner-btn.recording { background: var(--accent); transform: scale(0.6); border-radius: 10px; }
+        .camera-bottom-controls { width: 100%; display: flex; justify-content: space-around; align-items: center; color: white; font-weight: bold; font-size: 16px; padding-bottom: 30px; z-index: 10; position: absolute; bottom: 0; }
+        .album-btn { cursor: pointer; text-align: center; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 5px; }
         
-        /* Offline banner */
-        .offline-banner {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: #ff4444;
-            color: white;
-            padding: 12px;
-            text-align: center;
-            z-index: 10001;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-        }
+        #cameraReview { display: none; flex-direction: column; height: 100%; width: 100%; background: #000; position: absolute; top:0; left:0; z-index: 4500; }
+        .camera-tools { position: absolute; right: 15px; top: 70px; display: flex; flex-direction: column; gap: 20px; }
+        .cam-tool-btn { color: #fff; font-size: 24px; text-align: center; text-shadow: 0 2px 4px rgba(0,0,0,0.8); cursor: pointer; }
+        .cam-tool-btn span { display: block; font-size: 10px; margin-top: 5px; }
         
-        .offline-banner button {
-            background: white;
-            border: none;
-            padding: 5px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: bold;
-        }
+        /* Filter Tray */
+        #filterTray { position: absolute; bottom: 120px; width: 100%; overflow-x: auto; display: none; gap: 10px; padding: 10px; background: rgba(0,0,0,0.5); z-index: 15; }
+        .filter-option { width: 60px; height: 60px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; flex-shrink: 0; background-size: cover; background-position: center; }
+        .filter-option.active { border-color: var(--primary); }
+
+        /* Explore Section Titles */
+        .section-title { padding: 15px; font-size: 16px; font-weight: bold; color: var(--text); border-bottom: 1px solid var(--border); }
         
-        /* Floating Star Container */
-        #floatingStarContainer {
-            position: fixed;
-            bottom: 100px;
-            right: 15px;
-            width: 60px;
-            height: 60px;
-            cursor: pointer;
-            z-index: 9999;
-            display: none;
-            background: rgba(0,0,0,0.7);
-            border-radius: 50%;
-            backdrop-filter: blur(5px);
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-        }
-        
-        .progress-ring {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        
-        .progress-ring__circle {
-            transition: stroke-dashoffset 0.1s linear;
-            stroke: #ffd700;
-            stroke-width: 3;
-            fill: none;
-        }
-        
-        .floating-star-icon {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
-        #floatingStarText {
-            position: absolute;
-            bottom: -20px;
-            font-size: 10px;
-            color: white;
-            background: rgba(0,0,0,0.6);
-            padding: 2px 6px;
-            border-radius: 10px;
-            white-space: nowrap;
-        }
-        
-        /* Bottom Navigation */
-        .bottom-nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--bg);
-            backdrop-filter: blur(20px);
-            display: flex;
-            justify-content: space-around;
-            padding: 8px 0 12px;
-            border-top: 1px solid var(--border);
-            z-index: 1000;
-        }
-        
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-            opacity: 0.7;
-            transition: all 0.2s;
-        }
-        
-        .nav-item.active {
-            opacity: 1;
-            color: var(--primary);
-        }
-        
-        .nav-item i {
-            font-size: 22px;
-        }
-        
-        .nav-item span {
-            font-size: 11px;
-        }
-        
-        .camera-btn-nav {
-            width: 50px;
-            height: 50px;
-            background: linear-gradient(135deg, #fe2c55, #ff8c00);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: -15px;
-            box-shadow: 0 4px 15px rgba(254,44,85,0.4);
-        }
-        
-        .camera-btn-nav i {
-            font-size: 24px;
-            color: white;
-        }
+        .notification-item { display: flex; align-items: center; gap: 15px; padding: 15px 20px; border-bottom: 1px solid var(--input-bg); cursor: pointer; }
+        .notification-icon { width: 45px; height: 45px; border-radius: 50%; background: var(--input-bg); color: var(--primary); display: flex; justify-content: center; align-items: center; font-size: 18px; border: 1px solid var(--border); }
+        .sticker-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 10px 0; }
+        .sticker-item { background: var(--input-bg); border: 1px solid var(--border); border-radius: 10px; padding: 15px 5px; text-align: center; cursor: pointer; }
+
+        /* Custom Prompt Modal */
+        #customPromptModal { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 99999; justify-content: center; align-items: center; }
+        .prompt-box { background: var(--secondary-bg); width: 90%; max-width: 350px; border-radius: 15px; padding: 20px; border: 1px solid var(--border); text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+        .prompt-title { font-size: 18px; font-weight: bold; color: var(--primary); margin-bottom: 10px; }
+        .prompt-desc { font-size: 14px; color: #ccc; margin-bottom: 15px; }
     </style>
 </head>
-<body data-theme="dark" class="webview-fix">
+<body data-theme="dark">
+
     <!-- Global Loader -->
-    <div id="globalLoader" class="loading-overlay">
-        <div class="spinner"></div>
-        <div class="loading-text" id="loaderText">Loading Pikko Shorts...</div>
+    <div id="globalLoader" class="modal-overlay" style="align-items: center; z-index: 9999; background: rgba(0,0,0,0.7); display: none;">
+        <div style="text-align: center;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 45px; color: var(--primary);"></i>
+            <p style="color: var(--primary); margin-top: 15px; font-weight: bold;">Loading...</p>
+        </div>
     </div>
 
     <!-- Toast Message -->
-    <div class="toast-message" id="toastMessage"></div>
+    <div id="toastMessage" class="toast-message"></div>
 
-    <!-- Offline Banner -->
-    <div id="offlineBanner" class="offline-banner" style="display: none;">
-        <i class="fas fa-wifi-slash"></i> No internet connection
-        <button onclick="location.reload()"><i class="fas fa-sync-alt"></i> Refresh</button>
+    <!-- Custom Prompt Modal -->
+    <div id="customPromptModal">
+        <div class="prompt-box">
+            <div class="prompt-title" id="cpTitle">Title</div>
+            <div class="prompt-desc" id="cpDesc">Description</div>
+            <input type="text" id="cpInput" class="custom-input" style="text-align:center;">
+            <input type="text" id="cpInput2" class="custom-input" style="text-align:center; display:none;">
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="primary-btn" style="background:var(--input-bg); color:#fff;" onclick="closeCustomPrompt()">Cancel</button>
+                <button class="primary-btn" id="cpConfirmBtn">Confirm</button>
+            </div>
+        </div>
     </div>
 
-<!-- Floating Star Container - Perfectly Centered -->
-<div id="floatingStarContainer" style="display: none;">
-    <svg class="progress-ring" width="60" height="60" viewBox="0 0 60 60">
-        <circle class="progress-ring__circle-bg" cx="30" cy="30" r="26" fill="none" stroke="rgba(255,215,0,0.2)" stroke-width="3"/>
-        <circle class="progress-ring__circle" cx="30" cy="30" r="26" fill="none" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
-    </svg>
-    <div class="floating-star-icon">
-        <i class="fas fa-star"></i>
+    <!-- Splash Screen -->
+    <div id="splashScreen">
+        <i class="fas fa-play-circle splash-logo"></i>
+        <div class="splash-text">PIKKO SHORTS</div>
     </div>
-    <div id="floatingStarText">0/50</div>
-</div>
 
     <!-- Main Content Area -->
-    <div id="mainContent" class="content-area"></div>
+        <!-- Main Content Area -->
+    <div id="mainContent" class="content-area">
+        <div class="top-tabs-container">
+            <div class="top-tab" onclick="renderHome('following')">Following</div>
+            <div class="top-tab active" onclick="renderHome('foryou')">For You</div>
+        </div>
+        <div style="position: relative; width: 100%; height: 100%;">
+            <div id="initialBufferOverlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); backdrop-filter: blur(2px);">
+                <i class="fas fa-circle-notch fa-spin" style="font-size: 45px; color: var(--primary); text-shadow: 0 0 15px rgba(255, 215, 0, 0.8);"></i>
+                <p style="margin-top: 15px; color: #fff; font-weight: bold; letter-spacing: 1px;">Getting things ready...</p>
+            </div>
+            <div class="video-feed skeleton-feed">
+                <div class="blur-bg"></div>
+                <!-- Skeleton UI -->
+                <div class="pro-skeleton"><div class="sk-top"><span></span><span></span></div><div class="sk-avatar"><div class="circle"></div><div class="rect"></div><div class="rect" style="width:30px;"></div></div><div class="sk-bottom"><div class="line" style="width:60%;"></div><div class="line"></div></div></div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Side Menu Overlay -->
-    <div class="side-menu-overlay" id="menuOverlay" onclick="closeMenu()"></div>
-    
-    <!-- Side Menu -->
+    <!-- Side Menu Overlay & Drawer -->
+    <div class="menu-overlay" id="menuOverlay" onclick="closeProfileMenu()"></div>
     <div class="side-menu" id="sideMenu">
-        <h3 style="margin-bottom: 25px; padding-left: 10px; border-bottom: 1px solid var(--border); padding-bottom: 18px; display: flex; align-items: center; gap: 10px;">
-            <i class="fas fa-user-circle" style="font-size: 28px; color: var(--primary);"></i> Menu
-        </h3>
-        <div class="menu-item" onclick="openEditModal()"><i class="fas fa-user-edit"></i> Edit Profile</div>
-        <div class="menu-item" onclick="renderVerificationInfo()"><i class="fas fa-check-circle"></i> Verification</div>
-        <div class="menu-item" onclick="renderLeaderboard()"><i class="fas fa-trophy"></i> Leaderboard</div>
-        <div class="menu-item" onclick="renderPlaylists()"><i class="fas fa-list"></i> My Playlists</div>
-        <div class="menu-item" onclick="shareProfile()"><i class="fas fa-share-alt"></i> Share Profile</div>
-        <div class="menu-item" onclick="referEarn()"><i class="fas fa-user-friends"></i> Refer & Earn</div>
-        <div class="menu-item" onclick="openBackupRestore()"><i class="fas fa-database"></i> Backup / Restore</div>
-        <div class="menu-item" onclick="toggleTheme()"><i class="fas fa-moon" id="themeIcon"></i> <span id="themeText">Dark Mode</span><span style="margin-left:auto;" id="themeToggle">🌙</span></div>
-        <div class="menu-item" onclick="openAdminPanel()"><i class="fas fa-user-shield"></i> Admin Panel</div>
-        <div class="menu-item" onclick="goOffline()"><i class="fas fa-cloud-download-alt"></i> Offline Videos</div>
-        <div class="menu-item" onclick="handleLogout()" style="color: #fe2c55; margin-top: auto; border-top: 1px solid var(--border);"><i class="fas fa-sign-out-alt"></i> Log Out</div>
+        <div class="menu-header">
+            <h2>Pikko Menu</h2>
+            <i class="fas fa-times" style="font-size:20px; cursor:pointer;" onclick="closeProfileMenu()"></i>
+        </div>
+        <div style="flex:1; overflow-y:auto;">
+            <div class="menu-item" onclick="closeProfileMenu(); renderHome();"><i class="fas fa-home"></i> Home</div>
+            <div class="menu-item" onclick="closeProfileMenu(); openWallet();"><i class="fas fa-wallet"></i> My Wallet</div>
+            <div class="menu-item" onclick="closeProfileMenu(); showToast('Saved Videos feature coming soon');"><i class="fas fa-bookmark"></i> Saved Videos</div>
+            <div class="menu-item" onclick="closeProfileMenu(); openModal('creatorHubModal');"><i class="fas fa-crown"></i> Creator Hub</div>
+            <div class="menu-item" onclick="closeProfileMenu(); openModal('settingsModal');"><i class="fas fa-cog"></i> Settings</div>
+            <div class="menu-item" onclick="closeProfileMenu(); openSupportModal();"><i class="fas fa-headset"></i> Help & Support</div>
+        </div>
+        <div class="menu-item" style="color:var(--accent); border-top: 1px solid #333;" onclick="promptAdminPanel()"><i class="fas fa-user-shield"></i> Admin Panel</div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="full-screen-page" style="z-index: 3500;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeModal('settingsModal')"></i>
+            <h2>Settings</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content">
+            <div class="action-btn" style="background:var(--input-bg); padding:15px; border-radius:10px; border:1px solid var(--border); flex-direction:row; justify-content:space-between; width:100%;" onclick="openModal('aboutModal')">
+                <span style="font-size:16px;"><i class="fas fa-info-circle"></i> About App</span><i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="action-btn" style="background:var(--input-bg); padding:15px; border-radius:10px; border:1px solid var(--border); flex-direction:row; justify-content:space-between; width:100%;" onclick="openModal('privacyModal')">
+                <span style="font-size:16px;"><i class="fas fa-shield-alt"></i> Privacy Policy</span><i class="fas fa-chevron-right"></i>
+            </div>
+            <div class="action-btn" style="background:var(--accent); padding:15px; border-radius:10px; flex-direction:row; justify-content:center; width:100%; margin-top:20px;" onclick="logOut()">
+                <span style="font-size:16px; font-weight:bold;"><i class="fas fa-sign-out-alt"></i> Log Out</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Modal -->
+    <div id="aboutModal" class="full-screen-page" style="z-index: 3600;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeModal('aboutModal')"></i>
+            <h2>About App</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" style="text-align:center;">
+            <i class="fas fa-play-circle" style="font-size:80px; color:var(--primary); margin:20px 0;"></i>
+            <h2>Pikko Shorts</h2>
+            <p style="color:var(--muted-text); margin-top:10px;">Version 1.0.0 (Premium)</p>
+            <p style="margin-top:20px; line-height:1.5;">Pikko Shorts is a revolutionary short video platform designed for creators. Empower your creativity, build your audience, and monetize your content with our industry-leading tools and seamless interface.</p>
+        </div>
+    </div>
+
+    <!-- Privacy Modal -->
+    <div id="privacyModal" class="full-screen-page" style="z-index: 3600;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeModal('privacyModal')"></i>
+            <h2>Privacy Policy</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" style="line-height:1.6; color:#ccc;">
+            <h3 style="color:var(--primary); margin-bottom:10px;">Data Collection</h3>
+            <p>We collect essential data to provide and improve our services, including account details, content uploads, and usage analytics.</p>
+            <h3 style="color:var(--primary); margin-top:20px; margin-bottom:10px;">Security</h3>
+            <p>Your data is encrypted and securely stored. We do not sell your personal information to third parties.</p>
+            <h3 style="color:var(--primary); margin-top:20px; margin-bottom:10px;">User Rights</h3>
+            <p>You have the right to access, modify, or delete your account and personal data at any time via the settings.</p>
+        </div>
+    </div>
+
+    <!-- Help & Support System -->
+    <div id="supportModal" class="full-screen-page" style="z-index: 3500;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeModal('supportModal')"></i>
+            <h2>Help & Support</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" style="padding:15px;">
+            <div style="background:var(--input-bg); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border);">
+                <h3 style="color:var(--primary); margin-bottom:10px;">Send Feedback</h3>
+                <textarea id="feedbackInput" class="custom-input" placeholder="Describe your issue or feedback here..." rows="4"></textarea>
+                <button class="primary-btn" onclick="submitFeedback()">Submit Feedback</button>
+            </div>
+            <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px;">Your Feedback History</h3>
+            <div id="userFeedbackList" style="overflow-y:auto; flex:1;"></div>
+        </div>
+    </div>
+
+    <!-- Admin Panel Modal -->
+    <div id="adminPanelModal" class="full-screen-page" style="z-index: 4000;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeModal('adminPanelModal')"></i>
+            <h2 style="color: var(--accent);">Admin Dashboard</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" style="padding:10px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom: 20px;">
+                <div class="action-btn" style="background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333;" onclick="loadAdminRecharges()">
+                    <i class="fas fa-wallet" style="color:#FF9800; font-size:24px; margin-bottom:5px;"></i><span>Recharges</span>
+                </div>
+                <div class="action-btn" style="background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333;" onclick="loadAdminWithdraws()">
+                    <i class="fas fa-money-bill-wave" style="color:#4CAF50; font-size:24px; margin-bottom:5px;"></i><span>Withdrawals</span>
+                </div>
+                <div class="action-btn" style="background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333;" onclick="loadAdminFeedbacks()">
+                    <i class="fas fa-headset" style="color:#1DA1F2; font-size:24px; margin-bottom:5px;"></i><span>Support/Feedbacks</span>
+                </div>
+                <div class="action-btn" style="background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333;" onclick="showToast('Ban/Unban DB Sync Required')">
+                    <i class="fas fa-user-slash" style="color:#F44336; font-size:24px; margin-bottom:5px;"></i><span>Ban / Unban</span>
+                </div>
+            </div>
+            
+            <h3 id="adminSectionTitle" style="margin-bottom:10px; border-bottom:1px solid #333; padding-bottom:5px; color:var(--primary);">Select a Category</h3>
+            <div id="adminActivityLog" style="overflow-y:auto; flex:1;"></div>
+        </div>
+    </div>
+
+    <!-- Auth / Profile Creation Modal -->
+    <div id="authModal" class="full-screen-page" style="z-index: 3000;">
+        <div class="header-bar">
+            <i class="fas fa-times" onclick="closeAuthModal()"></i>
+            <h2>Create Profile</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" style="align-items: center; justify-content: center;">
+            <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--input-bg); border: 2px solid var(--primary); position: relative; cursor: pointer; margin-bottom: 20px;" onclick="document.getElementById('profilePicInput').click()">
+                <img id="profilePicPreview" src="https://via.placeholder.com/100" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                <i class="fas fa-camera" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: #000; padding: 6px; border-radius: 50%; font-size: 12px;"></i>
+            </div>
+            <input type="file" id="profilePicInput" accept="image/*" style="display: none;" onchange="previewProfilePic(this, 'profilePicPreview')">
+            <input type="text" id="authUsername" class="custom-input" placeholder="Enter Username (@)">
+            <textarea id="authBio" class="custom-input" placeholder="Write a short bio..."></textarea>
+            <button class="primary-btn" onclick="saveProfile()">Save & Continue</button>
+        </div>
     </div>
 
     <!-- Edit Profile Modal -->
-    <div id="editModal" class="modal-overlay"><div class="bottom-modal" style="height: auto; padding: 20px;"><h3 style="text-align:center; margin-bottom:25px;">Edit Profile</h3><div class="edit-pic-wrapper" onclick="document.getElementById('editFile').click()"><div id="previewPic" class="edit-pic"></div><div style="position:absolute; bottom:0; right:0; background:var(--primary); border-radius:50%; width:35px; height:35px; display:flex; justify-content:center; align-items:center;"><i class="fas fa-camera"></i></div></div><input type="file" id="editFile" hidden accept="image/*" onchange="previewImage(this)"><input type="text" id="editName" class="input-field" placeholder="Full Name"><input type="text" id="editUsername" class="input-field" placeholder="Username (without @)"><input type="text" id="editBio" class="input-field" placeholder="Bio"><button class="primary-btn" onclick="saveProfileChanges()">Save</button><button class="primary-btn" style="background:#444; margin-top:10px;" onclick="document.getElementById('editModal').style.display='none'">Cancel</button></div></div>
+    <div id="editProfileModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal">
+            <div class="modal-header">
+                <h3>Edit Profile</h3>
+                <i class="fas fa-times" onclick="document.getElementById('editProfileModal').style.display='none'"></i>
+            </div>
+            <div style="text-align: center; margin: 15px 0;">
+                <div style="width: 90px; height: 90px; border-radius: 50%; background: var(--input-bg); border: 2px solid var(--primary); position: relative; cursor: pointer; margin: 0 auto;" onclick="document.getElementById('editPicInput').click()">
+                    <img id="editPicPreview" src="" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                    <i class="fas fa-camera" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: #000; padding: 5px; border-radius: 50%; font-size: 10px;"></i>
+                </div>
+                <input type="file" id="editPicInput" accept="image/*" style="display: none;" onchange="previewProfilePic(this, 'editPicPreview')">
+            </div>
+            <input type="text" id="editUsername" class="custom-input" placeholder="Username">
+            <textarea id="editBio" class="custom-input" placeholder="Bio"></textarea>
+            <button class="primary-btn" onclick="saveEditedProfile()">Update Profile</button>
+        </div>
+    </div>
 
-    <!-- Playlist Modal -->
-    <div id="playlistModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span id="playlistTitle">Create Playlist</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('playlistModal').style.display='none'"></i></div><div class="user-list-content" id="playlistContent"><input type="text" id="playlistName" class="input-field" placeholder="Playlist Name"><button class="primary-btn" onclick="createPlaylist()">Create</button></div></div></div>
+    <!-- Custom Camera UI & Review -->
+    <div id="cameraModal">
+        <div class="camera-top-controls">
+            <i class="fas fa-times" onclick="closeCamera()"></i>
+            <i class="fas fa-bolt" onclick="showToast('Flash active on device support')"></i>
+        </div>
+        <div class="camera-tools">
+            <div class="cam-tool-btn" onclick="switchCamera()"><i class="fas fa-sync-alt"></i><span>Flip</span></div>
+            <div class="cam-tool-btn" onclick="document.getElementById('localMusicInput').click()"><i class="fas fa-music"></i><span>Music</span></div>
+            <div class="cam-tool-btn" onclick="toggleFilterTray()"><i class="fas fa-magic"></i><span>Filter</span></div>
+        </div>
+        
+        <div id="filterTray">
+            <div class="filter-option active" style="background:#fff;" onclick="applyCamFilter('none', this)"><span style="font-size:10px; color:#000; font-weight:bold; display:block; padding-top:20px;">Normal</span></div>
+            <div class="filter-option" style="background:linear-gradient(45deg, #cc9966, #ffcc99);" onclick="applyCamFilter('sepia(100%)', this)"><span style="font-size:10px; color:#000; font-weight:bold; display:block; padding-top:20px;">Sepia</span></div>
+            <div class="filter-option" style="background:#888;" onclick="applyCamFilter('grayscale(100%)', this)"><span style="font-size:10px; color:#fff; font-weight:bold; display:block; padding-top:20px;">B&W</span></div>
+            <div class="filter-option" style="background:linear-gradient(135deg, #ff00cc, #333399);" onclick="applyCamFilter('contrast(150%) saturate(150%)', this)"><span style="font-size:10px; color:#fff; font-weight:bold; display:block; padding-top:20px;">Vivid</span></div>
+            <div class="filter-option" style="background:linear-gradient(90deg, #fff, #000);" onclick="applyCamFilter('invert(100%)', this)"><span style="font-size:10px; color:#fff; font-weight:bold; display:block; padding-top:20px;">Invert</span></div>
+        </div>
 
-    <!-- Video Menu Modal -->
-    <div id="videoMenuModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span>Video Options</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('videoMenuModal').style.display='none'"></i></div><div class="user-list-content" id="videoMenuContent"></div></div></div>
+        <div style="width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden;">
+            <video id="cameraStreamRaw" autoplay playsinline style="display:none;"></video>
+            <canvas id="cameraStream" style="min-width: 100%; min-height: 100%; object-fit: cover; border-radius: 15px;"></canvas>
+        </div>
+        <div class="camera-bottom-controls">
+            <div class="album-btn" onclick="document.getElementById('videoFileInput').click()">
+                <i class="fas fa-images" style="font-size: 28px;"></i>
+                <span style="font-size: 12px;">Album</span>
+            </div>
+            <input type="file" id="videoFileInput" accept="video/*" style="display: none;" onchange="handleGalleryVideo(this)">
+            <div class="camera-shutter" onclick="captureVideo()"><div class="camera-inner-btn" id="cameraRecordInner"></div></div>
+            <div style="width: 40px;"></div>
+        </div>
+        
+        <div id="cameraReview">
+            <div class="premium-header"><i class="fas fa-arrow-left" onclick="cancelReview()" style="cursor:pointer;"></i><h2>Review</h2><div style="width:20px;"></div></div>
+            <video id="reviewVideo" autoplay loop style="width:100%; height:80%; object-fit:cover; background:#000;"></video>
+            <div style="position:absolute; bottom:30px; width:100%; text-align:center;">
+                <button onclick="proceedToUpload()" style="background:var(--primary); color:#000; border:none; padding:15px 40px; border-radius:30px; font-size:18px; font-weight:bold; box-shadow:0 4px 15px rgba(255,215,0,0.5); cursor:pointer;">Next <i class="fas fa-arrow-right"></i></button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="localMusicInput" accept="audio/*" style="display: none;" onchange="handleLocalMusic(this)">
+    <audio id="camAudioPlayer" style="display:none;"></audio>
 
-    <!-- User List Modal -->
-    <div id="userListModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="bottom-modal"><div class="user-list-header"><span id="listTitle">List</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="document.getElementById('userListModal').style.display='none'"></i></div><div class="user-list-content" id="listContent"></div></div></div>
+    <!-- Upload Page -->
+    <div id="uploadFullScreenPage" class="full-screen-page">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeUploadPage()"></i>
+            <h2>New Post</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content">
+            <video id="uploadPreviewVideo" controls style="width: 100%; max-height: 300px; background: #111; border-radius: 12px; object-fit: contain;"></video>
+            <textarea id="uploadCaption" class="custom-input" placeholder="Write a caption..."></textarea>
+            <button class="primary-btn" onclick="startVideoUpload()">Upload Video</button>
+        </div>
+    </div>
 
-    <!-- Comment Modal -->
-    <div id="commentModal" class="modal-overlay" onclick="if(event.target===this)closeComments()"><div class="bottom-modal"><div style="padding:18px; text-align:center; border-bottom:1px solid var(--border); font-weight:bold; font-size:18px;">Comments <span id="commentCount">(0)</span><i class="fas fa-times" style="position:absolute; right:20px; cursor:pointer;" onclick="closeComments()"></i></div><div class="comment-list" id="commentList" style="flex:1; overflow-y:auto; padding:15px;"></div><div style="padding:15px; display:flex; gap:10px; border-top:1px solid var(--border); background:var(--bg);"><input type="text" id="commentInput" style="flex:1; background:var(--input-bg); border:none; padding:12px; color:var(--text); border-radius:30px; outline:none;" placeholder="Add a comment..."><button onclick="postComment()" style="color:white; background:var(--primary); font-weight:bold; border:none; padding:10px 20px; border-radius:30px; cursor:pointer;">Post</button></div></div></div>
+    <!-- Search Overlay -->
+    <div id="searchOverlay" class="full-screen-page" style="z-index: 2500;">
+        <div class="search-bar" style="border-bottom: 1px solid var(--border);">
+            <i class="fas fa-arrow-left" onclick="closeSearchOverlay()" style="font-size: 20px; color: var(--text); padding-right: 15px; cursor: pointer;"></i>
+            <div style="flex:1; display:flex; align-items:center; background:var(--input-bg); border-radius:20px; padding:0 15px;">
+                <input type="text" id="exploreSearchInputActual" placeholder="Search creators..." style="flex:1; background:transparent; border:none; color:white; outline:none; padding:12px 0;" oninput="performSearch(this.value)">
+                <i class="fas fa-search" style="color:var(--primary); cursor:pointer;"></i>
+            </div>
+        </div>
+        <div id="overlaySearchResults" style="padding: 15px; overflow-y: auto; flex: 1;"></div>
+    </div>
 
-    <!-- Video Viewer Modal -->
-    <div id="videoViewerModal" class="modal-overlay"><i class="fas fa-times viewer-close" onclick="closeVideoViewer()"></i><video id="fullScreenVideo" class="viewer-video" controls autoplay></video></div>
+    <!-- Followers / Following List Modal -->
+    <div id="followListModal" class="full-screen-page" style="z-index: 2600;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="document.getElementById('followListModal').style.display='none'"></i>
+            <h2 id="followListTitle">List</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" id="followListContent" style="padding: 0;"></div>
+    </div>
 
-    <!-- Gift Modal -->
-    <div id="giftModal" class="modal-overlay"><div class="bottom-modal gift-modal"><div class="gift-header"><span>Send Stars to <span id="giftCreator"></span></span><i class="fas fa-times" onclick="document.getElementById('giftModal').style.display='none'"></i></div><div class="gift-content"><div class="gift-balance">Your Stars: <span id="senderStarBalance">0</span> ⭐</div><div class="gift-packages"><div class="gift-package" data-stars="1" onclick="selectGiftPackage(1)">1 ⭐</div><div class="gift-package" data-stars="5" onclick="selectGiftPackage(5)">5 ⭐</div><div class="gift-package" data-stars="10" onclick="selectGiftPackage(10)">10 ⭐</div><div class="gift-package" data-stars="20" onclick="selectGiftPackage(20)">20 ⭐</div><div class="gift-package" data-stars="50" onclick="selectGiftPackage(50)">50 ⭐</div></div><div class="gift-custom"><input type="range" id="giftSlider" min="1" max="100" value="1" oninput="updateGiftSlider()"><div class="gift-slider-value"><span id="giftSliderValue">1</span> ⭐</div></div><button class="gift-send-btn" onclick="sendGift()">Send Stars</button></div></div></div>
+    <!-- Other User Profile View Page -->
+    <div id="otherProfileModal" class="full-screen-page" style="z-index: 2600;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="document.getElementById('otherProfileModal').style.display='none'; renderHome(currentTab);"></i>
+            <h2 id="otherProfileTitle">Profile</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" id="otherProfileContent" style="padding: 0;"></div>
+    </div>
 
-    <!-- Verification Modal -->
-    <div id="verificationModal" class="modal-overlay"><div class="bottom-modal verification-modal"><div class="verification-header"><h2>Verification Status</h2><p>Complete requirements to unlock badges</p><i class="fas fa-times" style="position:absolute; right:20px; top:20px; cursor:pointer; font-size:20px; color:var(--muted-text);" onclick="document.getElementById('verificationModal').style.display='none'"></i></div><div class="verification-grid" id="userVerificationDetails">Loading...</div><div class="verification-footer"><i class="fas fa-info-circle"></i> Badges are automatically unlocked when requirements are met</div></div></div>
+    <!-- Wallet Page (Full Screen) -->
+    <div id="walletFullScreenPage" class="full-screen-page" style="z-index: 2500;">
+        <div class="header-bar">
+            <i class="fas fa-arrow-left" onclick="closeWallet()"></i>
+            <h2>My Wallet</h2>
+            <div style="width: 24px;"></div>
+        </div>
+        <div class="full-content" id="walletContentArea" style="padding: 0;"></div>
+    </div>
 
-    <!-- Camera Options Modal -->
-    <div id="cameraOptionsModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'"><div class="camera-options-modal"><h3 style="text-align:center; margin-bottom:20px; color: var(--text);">Upload Video</h3><div class="camera-option-btn" onclick="openCamera('environment')"><i class="fas fa-camera"></i><span>Record with Camera</span></div><div class="camera-option-btn" onclick="openCamera('user')"><i class="fas fa-camera-retro"></i><span>Take Selfie Video</span></div><div class="camera-option-btn" onclick="openGallery()"><i class="fas fa-images"></i><span>Choose from Gallery</span></div><div class="camera-close-btn" onclick="document.getElementById('cameraOptionsModal').style.display='none'">Cancel</div></div></div>
+    <!-- Bottom Modals (Gift, Comment) -->
+    <div id="giftModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal">
+            <div class="modal-header">
+                <h3>Send Gift</h3>
+                <span style="color: var(--primary); font-weight: bold;"><i class="fas fa-coins"></i> <span id="myCoinBal">0</span></span>
+            </div>
+            <div class="sticker-grid" id="stickerGrid"></div>
+        </div>
+    </div>
 
-    <!-- Leaderboard Modal -->
-    <div id="leaderboardModal" class="modal-overlay" style="z-index: 6000;"><div class="bottom-modal" style="height: 90vh; display: flex; flex-direction: column;"><div style="padding: 20px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 22px 22px 0 0; position: relative;"><h2 style="margin: 0; font-size: 22px; text-align: center;"><i class="fas fa-trophy" style="color:#ffd700;"></i> Top P-Coin Collectors</h2><i class="fas fa-times" style="position: absolute; right: 20px; top: 22px; font-size: 24px; cursor: pointer;" onclick="document.getElementById('leaderboardModal').style.display='none'"></i></div><div id="leaderboardContent" style="flex: 1; overflow-y: auto; padding: 15px; background: var(--bg);"></div></div></div>
+    <div id="commentModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'">
+        <div class="bottom-modal" style="height: 60vh;">
+            <div class="modal-header">
+                <h3>Comments</h3>
+                <i class="fas fa-times" onclick="document.getElementById('commentModal').style.display='none'"></i>
+            </div>
+            <div id="commentList" style="flex: 1; overflow-y: auto; padding: 10px 0; height: calc(100% - 110px);"></div>
+            <div style="display: flex; gap: 10px; margin-top: 10px; position: absolute; bottom: 20px; width: calc(100% - 40px);">
+                <input type="text" id="commentInput" class="custom-input" placeholder="Add a comment..." style="margin: 0;">
+                <button class="primary-btn" style="width: auto; margin: 0; padding: 10px 20px;" onclick="postComment()">Post</button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Chat Modal -->
-    <div id="chatModal" class="modal-overlay" style="z-index: 6000;"><div class="bottom-modal" style="height: 85vh; display: flex; flex-direction: column; background: var(--bg);"><div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 15px; background: var(--secondary-bg);"><i class="fas fa-arrow-left" style="font-size: 20px; cursor: pointer; color: var(--text);" onclick="closeChat()"></i><div id="chatUserAvatar" style="width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; font-size: 18px;"></div><div style="flex: 1;"><div id="chatUserName" style="font-weight: bold; font-size: 16px; color: var(--text);">Name</div><div id="chatUserHandle" style="font-size: 12px; color: var(--muted-text);">@username</div></div></div><div id="chatMessages" style="flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 12px;"></div><div style="padding: 12px 15px; border-top: 1px solid var(--border); display: flex; gap: 10px; background: var(--secondary-bg);"><div class="chat-attach-btn" onclick="openMediaPicker()"><i class="fas fa-image"></i></div><input type="text" id="chatInput" placeholder="Type a message..." style="flex: 1; background: var(--input-bg); border: 1px solid var(--border); padding: 12px 18px; border-radius: 25px; color: var(--text); outline: none; font-size: 14px;"><button onclick="sendMessage()" style="background: var(--primary); color: white; border: none; width: 45px; height: 45px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 10px var(--primary-glow);"><i class="fas fa-paper-plane"></i></button></div></div></div>
+    <div id="videoPlayerModal" class="full-screen-page" style="z-index: 2500;">
+        <div class="header-bar" style="position: absolute; width: 100%; background: transparent; border: none; z-index: 2501;">
+            <i class="fas fa-arrow-left" style="text-shadow: 0 2px 4px #000;" onclick="closeExploreVideo()"></i>
+        </div>
+        <div id="exploreVideoContainer" style="width: 100%; height: 100%;"></div>
+    </div>
+
+    <!-- Professional Payment Modal (For Recharge & Subscription) -->
+    <div id="paymentModal" class="modal-overlay" onclick="if(event.target===this)this.style.display='none'" style="z-index: 3500;">
+        <div class="bottom-modal" style="text-align: center; background: var(--secondary-bg);">
+            <h3 style="color: var(--primary); margin-bottom: 5px;">Secure Checkout</h3>
+            
+            <div class="payment-card-ui">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div class="card-chip"></div>
+                    <i class="fab fa-cc-visa" style="font-size:30px; color:rgba(255,255,255,0.2);"></i>
+                </div>
+                <div class="card-title">Amount to Pay</div>
+                <div class="card-amount">₹<span id="payAmountTxt">0</span></div>
+                <div style="display: flex; justify-content: space-between; color: #888; font-size: 12px; border-top:1px solid rgba(255,255,255,0.1); padding-top:10px;">
+                    <span id="payDescTxt">Order Details</span>
+                    <span style="color:#FF9800;"><i class="fas fa-clock"></i> Admin Approval Req.</span>
+                </div>
+            </div>
+
+            <div class="upi-box">
+                <div style="text-align:left;">
+                    <p style="margin-bottom: 5px; color: var(--muted-text); font-size:12px;">Send manual payment via UPI:</p>
+                    <p style="font-size:16px; font-weight:bold; color:#fff;" id="adminUpiId">8391921082@ibl</p>
+                </div>
+                <button onclick="copyUpi()" style="background:var(--input-bg); border:1px solid var(--border); color:#fff; padding:10px; border-radius:8px; cursor:pointer;"><i class="fas fa-copy"></i></button>
+            </div>
+            
+            <input type="text" id="txnIdInput" class="custom-input" placeholder="Enter 12-Digit UTR / Transaction ID" style="text-align:center; letter-spacing:1px;">
+            <button class="primary-btn" onclick="submitPaymentRequest()" style="background: linear-gradient(90deg, #4CAF50, #2E7D32); color:#fff; box-shadow:0 4px 15px rgba(76,175,80,0.4);">Verify & Confirm Payment</button>
+        </div>
+    </div>
+
+    <!-- Creator Hub Modals -->
+    <div id="creatorHubModal" class="premium-modal">
+        <div class="premium-header"><i class="fas fa-arrow-left" style="font-size: 20px; cursor:pointer;" onclick="closeModal('creatorHubModal')"></i><h2><i class="fas fa-crown"></i> Creator Hub</h2><div style="width: 20px;"></div></div>
+        <div class="premium-content">
+            <div class="action-btn" style="background:#1a1a1a; padding:20px; border-radius:12px; border: 1px solid #333; display:flex; flex-direction:row; align-items:center; justify-content:space-between; margin-bottom:15px; cursor:pointer;" onclick="openModal('verifyModal')">
+                <span style="font-size:16px; font-weight:bold; color:#fff;"><i class="fas fa-check-circle" style="color:#1DA1F2; margin-right:10px;"></i> Verification</span>
+                <i class="fas fa-chevron-right" style="color:#555;"></i>
+            </div>
+            <div class="action-btn" style="background:#1a1a1a; padding:20px; border-radius:12px; border: 1px solid #333; display:flex; flex-direction:row; align-items:center; justify-content:space-between; margin-bottom:15px; cursor:pointer;" onclick="openMonetizationPage()">
+                <span style="font-size:16px; font-weight:bold; color:#fff;"><i class="fas fa-dollar-sign" style="color:gold; margin-right:15px;"></i> Monetization</span>
+                <i class="fas fa-chevron-right" style="color:#555;"></i>
+            </div>
+            <div class="action-btn" style="background:#1a1a1a; padding:20px; border-radius:12px; border: 1px solid #333; display:flex; flex-direction:row; align-items:center; justify-content:space-between; cursor:pointer;" onclick="openModal('analyzeModal')">
+                <span style="font-size:16px; font-weight:bold; color:#fff;"><i class="fas fa-chart-pie" style="color:#e91e63; margin-right:10px;"></i> Analyze Account</span>
+                <i class="fas fa-chevron-right" style="color:#555;"></i>
+            </div>
+        </div>
+    </div>
+
+    <div id="verifyModal" class="premium-modal">
+        <div class="premium-header"><i class="fas fa-arrow-left" style="font-size: 20px; cursor:pointer;" onclick="closeModal('verifyModal')"></i><h2>Verification</h2><div style="width: 20px;"></div></div>
+        <div class="premium-content">
+            <div class="veri-card white">
+                <h3><i class="fas fa-check-circle badge-white"></i> White Tick</h3>
+                <div class="veri-req">Requires: 10 Followers, 10 Videos<br>Benefit: Basic Verification</div>
+                <button class="veri-btn active" onclick="applyVerification('white')">Apply Now</button>
+            </div>
+            <div class="veri-card blue">
+                <h3><i class="fas fa-check-circle badge-blue"></i> Blue Tick</h3>
+                <div class="veri-req">Requires: 50+ Followers, 20 Videos/mo, 50 P-Coins<br>Benefit: 3 Extra Daily Coins</div>
+                <button class="veri-btn active" onclick="applyVerification('blue')">Pay 50 Coins & Apply</button>
+            </div>
+            <div class="veri-card golden">
+                <h3><i class="fas fa-check-circle badge-golden"></i> Golden Tick</h3>
+                <div class="veri-req">Requirement: Direct Subscription<br>Benefit: Monetization, 5 Extra Daily Coins, VIP Frame</div>
+                <button class="veri-btn active" onclick="applyVerification('golden')" id="goldenSubBtn" style="background:linear-gradient(90deg, #FFD700, #b8860b); color:#000; box-shadow:0 4px 15px rgba(255,215,0,0.3);">Subscribe</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="monetizeModal" class="premium-modal">
+        <div class="premium-header"><i class="fas fa-arrow-left" style="font-size: 20px; cursor:pointer;" onclick="closeModal('monetizeModal')"></i><h2>Monetization</h2><div style="width: 20px;"></div></div>
+        <div class="premium-content">
+            <div style="background: linear-gradient(135deg, #4CAF50, #2E7D32); padding: 20px; border-radius: 12px; text-align: center; margin-bottom: 20px; box-shadow:0 10px 20px rgba(0,0,0,0.5);">
+                <span style="color:#e8f5e9; font-size:14px;">Total Ad Revenue</span>
+                <h2 style="font-size:36px; margin:10px 0; color:#fff;">₹ <span id="monEarn">0.00</span></h2>
+                <div style="font-size:12px; color:#c8e6c9; background:rgba(0,0,0,0.2); padding:5px; border-radius:5px; display:inline-block;">Rate: 1000 Views = ₹100</div>
+            </div>
+            <p style="color:#aaa; text-align:center; font-size:14px;">Earnings are automatically added to your Wallet balance.</p>
+        </div>
+    </div>
+
+    <div id="analyzeModal" class="premium-modal">
+        <div class="premium-header"><i class="fas fa-arrow-left" style="font-size: 20px; cursor:pointer;" onclick="closeModal('analyzeModal')"></i><h2>Account Analyze</h2><div style="width: 20px;"></div></div>
+        <div class="premium-content">
+            <button class="primary-btn" onclick="syncAnalyzeData()" style="margin-bottom:20px;"><i class="fas fa-sync-alt"></i> Sync Data</button>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+                <div style="background:var(--input-bg); padding:20px 15px; border-radius:12px; text-align:center; border:1px solid #333;">
+                    <h3 style="color:#1DA1F2; font-size:28px; margin:0 0 5px 0;" id="anaFollow">0</h3><span style="font-size:12px; color:#888; text-transform:uppercase;">Followers</span>
+                </div>
+                <div style="background:var(--input-bg); padding:20px 15px; border-radius:12px; text-align:center; border:1px solid #333;">
+                    <h3 style="color:#e91e63; font-size:28px; margin:0 0 5px 0;" id="anaViews">0</h3><span style="font-size:12px; color:#888; text-transform:uppercase;">Total Views</span>
+                </div>
+                <div style="background:var(--input-bg); padding:20px 15px; border-radius:12px; text-align:center; border:1px solid #333; grid-column: span 2;">
+                    <h3 style="color:#FFD700; font-size:32px; margin:0 0 5px 0;" id="anaEarn">₹0</h3><span style="font-size:12px; color:#888; text-transform:uppercase;">Monetization Earned</span>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Bottom Navigation -->
     <div class="bottom-nav">
-        <div class="nav-item active" onclick="renderHome()"><i class="fas fa-home"></i><span>Home</span></div>
-        <div class="nav-item" onclick="renderExplore()"><i class="fas fa-search"></i><span>Explore</span></div>
-        <div class="nav-item" onclick="showCameraOptions()"><div class="camera-btn-nav"><i class="fas fa-camera"></i></div></div>
-        <div class="nav-item" onclick="renderNotify()"><i class="fas fa-bell"></i><span>Notify</span></div>
-        <div class="nav-item" onclick="renderProfile()"><i class="fas fa-user"></i><span>Profile</span></div>
+        <div class="nav-item active" onclick="renderHome()"><i class="fas fa-home"></i></div>
+        <div class="nav-item" onclick="renderExplore()"><i class="fas fa-search"></i></div>
+        <div class="nav-item upload-btn-wrapper" onclick="requireAuth(openCamera)">
+            <div class="camera-btn-nav"><i class="fas fa-plus"></i></div>
+        </div>
+        <div class="nav-item" onclick="requireAuth(renderNotify)"><i class="fas fa-bell"></i></div>
+        <div class="nav-item" onclick="requireAuth(renderProfile)"><i class="fas fa-user"></i></div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
-    
-    <!-- Firebase Messaging SDK -->
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-messaging-compat.js"></script>
 
-<script>
-// FCM Push Notification সিস্টেম
-(function initPushNotifications() {
-    // ফায়ারবেস ইতিমধ্যে initialized আছে app.js-এ
-    
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-            .then((registration) => {
-                console.log('Service Worker registered:', registration);
-                
-                // Firebase Messaging instance
-                const messaging = firebase.messaging();
-                
-                // VAPID key (আপনার Web Push Certificate থেকে)
-                const vapidKey = 'hIOJq7AvUSVaHQ9pUK4WPH4WKfL_4iOj9a3RJO-G9C8wFPtgEmOyYD797NKmeeu1hwQvlhftCw3ziq9gjL7A8M8KbTJwdPswohknuw4ciLU';
-                
-                // পারমিশন চাওয়া
-                async function requestNotificationPermission() {
-                    try {
-                        const permission = await Notification.requestPermission();
-                        if (permission === 'granted') {
-                            console.log('Notification permission granted');
-                            
-                            // টোকেন জেনারেট করুন
-                            const token = await messaging.getToken({
-                                vapidKey: vapidKey,
-                                serviceWorkerRegistration: registration
-                            });
-                            
-                            console.log('FCM Token:', token);
-                            
-                            // টোকেন ফায়ারবেসে সেভ করুন
-                            const user = getActiveUser();
-                            if (user && user.username) {
-                                await db.collection('users').doc(user.username).update({
-                                    fcmToken: token,
-                                    fcmTokenUpdated: firebase.firestore.FieldValue.serverTimestamp()
-                                }).catch(e => console.log('Token save error:', e));
-                            }
-                            
-                            localStorage.setItem('fcmToken', token);
-                        } else {
-                            console.log('Notification permission denied');
-                        }
-                    } catch (error) {
-                        console.error('Error getting notification permission:', error);
-                    }
-                }
-                
-                // ফোরগ্রাউন্ড নোটিফিকেশন হ্যান্ডলার
-                messaging.onMessage((payload) => {
-                    console.log('Foreground message:', payload);
-                    if (payload.notification) {
-                        showToast(payload.notification.body, 4000);
-                    }
-                });
-                
-                // লগইন বা রিলোডে টোকেন আপডেট
-                if (Notification.permission === 'granted') {
-                    requestNotificationPermission();
-                } else if (Notification.permission !== 'denied') {
-                    // ইউজার অ্যাক্টিভ হলে ৫ সেকেন্ড পর চাইব
-                    setTimeout(() => {
-                        const user = getActiveUser();
-                        if (user) {
-                            requestNotificationPermission();
-                        }
-                    }, 5000);
-                }
-                
-                // টোকেন রিফ্রেশ লিসেনার
-                messaging.onTokenRefresh(async () => {
-                    const newToken = await messaging.getToken({ vapidKey: vapidKey });
-                    console.log('Token refreshed:', newToken);
-                    const user = getActiveUser();
-                    if (user) {
-                        await db.collection('users').doc(user.username).update({ fcmToken: newToken });
-                    }
-                });
-                
-            .catch(err => console.log('Service Worker registration failed:', err));
-    } else {
-        console.log('Service Worker not supported');
-    }
-})();
-</script>
-    
-    <!-- Main App JS -->
-    <script src="app.js"></script>
-    
-    <!-- Final Safety Script - ensures app loads even if app.js fails -->
     <script>
-        (function() {
-            // Safety timeout - hide loader after 5 seconds even if app.js fails
-            setTimeout(function() {
-                var loader = document.getElementById('globalLoader');
-                if (loader && loader.style.display !== 'none') {
-                    loader.style.display = 'none';
-                    var mainContent = document.getElementById('mainContent');
-                    if (mainContent && (!mainContent.innerHTML || mainContent.innerHTML.trim() === '')) {
-                        mainContent.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; padding:20px; text-align:center;"><div style="width:80px; height:80px; background:linear-gradient(135deg,#fe2c55,#ff8c00); border-radius:50%; display:flex; align-items:center; justify-content:center; margin-bottom:20px;"><i class="fas fa-video" style="font-size:40px; color:white;"></i></div><h2 style="margin-bottom:10px;">Welcome to Pikko Shorts</h2><p style="color:#888; margin-bottom:20px;">Tap to continue</p><button onclick="location.reload()" style="background:#fe2c55; color:white; border:none; padding:12px 30px; border-radius:30px;">Refresh App</button></div>';
-                    }
-                }
-            }, 5000);
+        // ===== FIREBASE CONFIGURATION & GLOBALS =====
+        const firebaseConfig = {
+            apiKey: "AIzaSyBU7zL9e_q1dDSsVMHNw7iJNuunzhzSH0k",
+            authDomain: "pikko-shorts-99a1b.firebaseapp.com",
+            projectId: "pikko-shorts-99a1b",
+            storageBucket: "pikko-shorts-99a1b.firebasestorage.app",
+            messagingSenderId: "999981600608",
+            appId: "1:999981600608:web:ae22fb1735ea7a37375805"
+        };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const contentDiv = document.getElementById('mainContent');
+        let currentTab = 'foryou';
+      let isInitialLoad = true;
+      let appLaunchTime = Date.now();
+        let videoCache = JSON.parse(localStorage.getItem('pikko_video_cache')) || [];
+        const encAdminPass = "MDg2Mw=="; // 0863 Base64 Encoded
+
+        const stickers = [{ id: 1, name: "Rose", coins: 5, icon: "🌹" }, { id: 2, name: "Heart", coins: 10, icon: "💖" },
+            { id: 3, name: "Fire", coins: 15, icon: "🔥" }, { id: 4, name: "Star", coins: 20, icon: "⭐" },
+            { id: 5, name: "Trophy", coins: 30, icon: "🏆" }
+        ];
+        
+        // Professional Recharge Packs
+        const rechargePacks = [
+            { coins: 10, price: 9, bonus: 'Starter' }, 
+            { coins: 50, price: 45, bonus: '+5 Bonus Coins' }, 
+            { coins: 100, price: 90, bonus: '+15 Bonus Coins' }, 
+            { coins: 500, price: 400, bonus: 'Best Value! Save ₹50' }
+        ];
+
+        // ===== USER DATA MANAGEMENT =====
+        let currentUser = null;
+        function getUserData() {
+            let u = JSON.parse(localStorage.getItem('pikko_user'));
+            if(!u) return null;
+            if(!u.history) u.history = [];
+            if(!u.following) u.following = [];
+            if(!u.followersArray) u.followersArray = []; 
+            if(!u.followers) u.followers = 0;
+            if(!u.videos) u.videos = 0;
+            if(!u.totalViews) u.totalViews = 0;
+            if(!u.pCoins) u.pCoins = 0;
+            if(!u.earnedCoins) u.earnedCoins = 0;
+            if(!u.verification) u.verification = 'none';
+            if(u.hasTrial === undefined) u.hasTrial = false;
+            return u;
+        }
+        function saveUserData(u) {
+            localStorage.setItem('pikko_user', JSON.stringify(u));
+            currentUser = u;
+        }
+        function addHistory(title, amt, type) {
+            let u = getUserData();
+            if(!u) return;
+            u.history.unshift({ title, amt, type, date: new Date().toLocaleString() });
+            if(u.history.length > 50) u.history.pop();
+            saveUserData(u);
+        }
+
+        // ===== MOCK DATABASE FOR ADMIN & SUPPORT (Fallback to LocalStorage) =====
+        function getMockDB(key) { return JSON.parse(localStorage.getItem(key)) || []; }
+        function saveMockDB(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+        // ===== CUSTOM PROMPT SYSTEM =====
+        let promptConfirmCallback = null;
+        function showCustomPrompt(title, desc, placeholder, needsTwoInputs, callback) {
+            document.getElementById('cpTitle').innerText = title;
+            document.getElementById('cpDesc').innerText = desc;
+            document.getElementById('cpInput').placeholder = placeholder;
+            document.getElementById('cpInput').value = '';
             
-            // WebView hardware acceleration fix
-            if (navigator.userAgent.includes('Android')) {
-                document.body.style.transform = 'translate3d(0,0,0)';
-                document.body.style.webkitTransform = 'translate3d(0,0,0)';
+            if(needsTwoInputs) {
+                document.getElementById('cpInput2').style.display = 'block';
+                document.getElementById('cpInput2').placeholder = "Enter Bank A/C, PhonePe, Paytm, or UPI ID:";
+                document.getElementById('cpInput2').value = '';
+            } else {
+                document.getElementById('cpInput2').style.display = 'none';
             }
             
-            // Handle visibility change (prevents black screen on resume)
-            document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    setTimeout(function() {
-                        window.dispatchEvent(new Event('resize'));
-                    }, 100);
+            document.getElementById('customPromptModal').style.display = 'flex';
+            promptConfirmCallback = callback;
+        }
+        function closeCustomPrompt() { document.getElementById('customPromptModal').style.display = 'none'; }
+        
+        document.getElementById('cpConfirmBtn').addEventListener('click', () => {
+            let val1 = document.getElementById('cpInput').value.trim();
+            let val2 = document.getElementById('cpInput2').value.trim();
+            if(promptConfirmCallback) {
+                if(document.getElementById('cpInput2').style.display === 'block') {
+                    if(val1 && val2) { closeCustomPrompt(); promptConfirmCallback({amount: val1, upi: val2}); }
+                    else showToast("Please fill all fields.");
+                } else {
+                    if(val1) { closeCustomPrompt(); promptConfirmCallback(val1); }
+                    else showToast("Please enter a value.");
+                }
+            }
+        });
+
+        // ===== UTILITIES =====
+        function showToast(msg) {
+            const toast = document.getElementById('toastMessage');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => toast.style.display = 'none', 3000);
+        }
+        function updateNavActive(index) {
+            document.querySelectorAll('.nav-item').forEach((el, i) => {
+                if (i === index) el.classList.add('active'); else el.classList.remove('active');
+            });
+        }
+        function openModal(id) { document.getElementById(id).style.display = 'flex'; }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function requireAuth(callback) {
+            currentUser = getUserData();
+            if (currentUser) { callback(); } else { pauseAllVideos(); document.getElementById('authModal').style.display = 'flex'; }
+        }
+        function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; if (!currentUser) renderHome(); }
+        function pauseAllVideos() { document.querySelectorAll('video').forEach(v => { v.pause(); v.muted = true; }); }
+        function showLoader() { document.getElementById('globalLoader').style.display = 'flex'; }
+        function hideLoader() { document.getElementById('globalLoader').style.display = 'none'; }
+        function safeStr(str) { return (str && str !== 'undefined' && str !== 'null') ? str.toString().replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, ' ') : ''; }
+        
+        function getThumbUrl(url) { return (url && url.includes('cloudinary.com') && url.endsWith('.mp4')) ? url.replace('.mp4', '.jpg') : (url || ''); }
+        
+        function getOptimizedVideoUrl(url) {
+            if (url && url.includes('cloudinary.com') && url.includes('/upload/')) {
+                return url.replace('/upload/', '/upload/q_auto,f_auto/');
+            }
+            return url;
+        }
+        
+        function getVerificationBadge(veriStatus) {
+            if (veriStatus === 'white') return '<i class="fas fa-check-circle badge-white" style="font-size:14px;"></i>';
+            if (veriStatus === 'blue') return '<i class="fas fa-check-circle badge-blue" style="font-size:14px;"></i>';
+            if (veriStatus === 'golden') return '<i class="fas fa-check-circle badge-golden" style="font-size:14px;"></i>';
+            return '';
+        }
+
+        function logOut() {
+            localStorage.removeItem('pikko_user');
+            window.location.reload();
+        }
+
+        // INITIAL LOAD
+        window.onload = () => {
+            currentUser = getUserData();
+            hideLoader();
+            renderHome();
+        };
+
+        // ===== PROFILE & DRAWER MENU =====
+        function openProfileMenu() { document.getElementById('sideMenu').classList.add('open'); document.getElementById('menuOverlay').style.display = 'block'; }
+        function closeProfileMenu() { document.getElementById('sideMenu').classList.remove('open'); document.getElementById('menuOverlay').style.display = 'none'; }
+        
+        function promptAdminPanel() {
+            closeProfileMenu();
+            showCustomPrompt("Admin Verification", "Enter Admin Password:", "Password", false, (pass) => {
+                if (btoa(pass) === encAdminPass) {
+                    showToast("Admin Authenticated!");
+                    openModal('adminPanelModal');
+                    loadAdminRecharges();
+                } else { showToast("Wrong Password!"); }
+            });
+        }
+
+        // ===== SUPPORT / FEEDBACK SYSTEM =====
+        function openSupportModal() {
+            requireAuth(() => {
+                openModal('supportModal');
+                loadUserFeedbacks();
+            });
+        }
+        function submitFeedback() {
+            let u = getUserData();
+            let text = document.getElementById('feedbackInput').value.trim();
+            if(!text) return showToast("Please write something.");
+            
+            let feedbacks = getMockDB('pikko_feedbacks');
+            feedbacks.unshift({ id: Date.now(), userId: u.id, username: u.username, text: text, status: 'Pending', reply: '', date: new Date().toLocaleString() });
+            saveMockDB('pikko_feedbacks', feedbacks);
+            
+            document.getElementById('feedbackInput').value = '';
+            showToast("Feedback sent to Admin successfully!");
+            loadUserFeedbacks();
+        }
+        function loadUserFeedbacks() {
+            let u = getUserData();
+            let feedbacks = getMockDB('pikko_feedbacks').filter(f => f.userId === u.id);
+            let list = document.getElementById('userFeedbackList');
+            if(feedbacks.length === 0) { list.innerHTML = '<p style="text-align:center; color:#888;">No feedback history.</p>'; return; }
+            
+            list.innerHTML = '';
+            feedbacks.forEach(f => {
+                let statusColor = f.status === 'Pending' ? '#FF9800' : '#4CAF50';
+                let replyHtml = f.reply ? `<div style="margin-top:10px; padding:10px; background:rgba(76,175,80,0.1); border-left:3px solid #4CAF50; border-radius:5px;"><strong style="color:#4CAF50;">Admin Reply:</strong><br>${f.reply}</div>` : '';
+                list.innerHTML += `
+                    <div style="background:var(--secondary-bg); padding:15px; border-radius:10px; margin-bottom:10px; border:1px solid var(--border);">
+                        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                            <span style="font-size:12px; color:var(--muted-text);">${f.date}</span>
+                            <span style="font-size:12px; font-weight:bold; color:${statusColor};">${f.status}</span>
+                        </div>
+                        <p style="font-size:14px;">${f.text}</p>
+                        ${replyHtml}
+                    </div>`;
+            });
+        }
+
+        // ===== ADMIN PANEL CONTROLS =====
+        function loadAdminRecharges() {
+            document.getElementById('adminSectionTitle').innerText = 'Pending Recharges';
+            let requests = getMockDB('pikko_recharges').filter(r => r.status === 'pending');
+            let log = document.getElementById('adminActivityLog');
+            if(requests.length === 0) { log.innerHTML = '<p style="text-align:center; color:#888;">No pending requests.</p>'; return; }
+            
+            log.innerHTML = requests.map(r => `
+                <div class="history-item">
+                    <div><div>${r.desc} - User: @${r.username}</div><div class="history-date">UTR: ${r.txnId}</div></div>
+                    <button style="background:#4CAF50; color:#fff; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;" onclick="approvePayment('${r.id}', 'recharge')">Approve</button>
+                </div>`).join('');
+        }
+
+        function loadAdminWithdraws() {
+            document.getElementById('adminSectionTitle').innerText = 'Withdraw Requests';
+            let requests = getMockDB('pikko_withdraws').filter(r => r.status === 'pending');
+            let log = document.getElementById('adminActivityLog');
+            if(requests.length === 0) { log.innerHTML = '<p style="text-align:center; color:#888;">No pending requests.</p>'; return; }
+            
+            log.innerHTML = requests.map(r => `
+                <div class="history-item">
+                    <div><div>User: @${r.username} - Amount: ₹${r.amount}</div><div class="history-date">UPI: ${r.upi}</div></div>
+                    <button style="background:#4CAF50; color:#fff; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;" onclick="approveWithdraw('${r.id}')">Paid</button>
+                </div>`).join('');
+        }
+
+        function loadAdminFeedbacks() {
+            document.getElementById('adminSectionTitle').innerText = 'User Feedbacks';
+            let requests = getMockDB('pikko_feedbacks').filter(f => f.status === 'Pending');
+            let log = document.getElementById('adminActivityLog');
+            if(requests.length === 0) { log.innerHTML = '<p style="text-align:center; color:#888;">No pending feedbacks.</p>'; return; }
+            
+            log.innerHTML = requests.map(r => `
+                <div style="background:var(--input-bg); padding:15px; border-radius:10px; margin-bottom:10px; border:1px solid #333;">
+                    <div style="font-size:12px; color:var(--primary); margin-bottom:5px;">User: @${r.username}</div>
+                    <p style="font-size:14px; margin-bottom:10px;">${r.text}</p>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="reply_${r.id}" placeholder="Admin Reply..." style="flex:1; padding:5px; border-radius:5px; border:none; background:var(--bg); color:#fff;">
+                        <button style="background:#1DA1F2; color:#fff; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;" onclick="replyToFeedback('${r.id}')">Send Reply</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        function replyToFeedback(id) {
+            let replyText = document.getElementById(`reply_${id}`).value.trim();
+            if(!replyText) return showToast("Reply cannot be empty");
+            let requests = getMockDB('pikko_feedbacks');
+            let idx = requests.findIndex(r => r.id.toString() === id.toString());
+            if(idx > -1) {
+                requests[idx].status = 'Reviewed';
+                requests[idx].reply = replyText;
+                saveMockDB('pikko_feedbacks', requests);
+                showToast("Reply sent successfully.");
+                loadAdminFeedbacks();
+            }
+        }
+
+        function approvePayment(id, type) {
+    let requests = getMockDB('pikko_recharges');
+    let idx = requests.findIndex(r => r.id.toString() === id.toString());
+    if(idx > -1) {
+        let req = requests[idx];
+        req.status = 'approved';
+        saveMockDB('pikko_recharges', requests);
+        
+        // Realtime Syncing the user's DB doc for P-Coins/Verification
+        if(req.paymentType === 'recharge') {
+            db.collection('users').doc(req.userId).update({ pCoins: firebase.firestore.FieldValue.increment(parseInt(req.coins)) });
+        } else if(req.paymentType === 'golden_sub') {
+            db.collection('users').doc(req.userId).update({ verification: 'golden' });
+            
+            // নতুন যোগ করা লাইন: ইউজারের সমস্ত ভিডিওতে ভেরিফিকেশন টিক আপডেট করবে
+            updateAllUserVideos(req.userId, 'golden'); 
+        }
+
+        if(currentUser && req.userId === currentUser.id) {
+            let u = getUserData();
+            if(req.paymentType === 'recharge') {
+                u.pCoins += parseInt(req.coins);
+                addHistory(`Received ${req.coins} Coins`, `+${req.coins} Coins`, "positive");
+            } else if (req.paymentType === 'golden_sub') {
+                u.verification = 'golden';
+                u.hasTrial = true;
+                addHistory(`Golden Tick Activated`, `Success`, "positive");
+            }
+            saveUserData(u);
+        }
+        
+        // নতুন যোগ করা লাইন: লোকাল ক্যাশ ক্লিয়ার করবে যাতে নতুন টিক সাথে সাথে দেখা যায়
+        localStorage.removeItem('pikko_video_cache');
+
+        showToast("Request Approved!");
+        loadAdminRecharges();
+    }
+}
+
+        function approveWithdraw(id) {
+            let requests = getMockDB('pikko_withdraws');
+            let idx = requests.findIndex(r => r.id.toString() === id.toString());
+            if(idx > -1) {
+                let req = requests[idx];
+                req.status = 'approved';
+                saveMockDB('pikko_withdraws', requests);
+                
+                if(currentUser && req.userId === currentUser.id) {
+                    let u = getUserData();
+                    addHistory("Withdrawal Successful", `-₹${req.amount}`, "negative");
+                    saveUserData(u);
+                }
+                showToast("Withdrawal marked as Paid!");
+                loadAdminWithdraws();
+            }
+        }
+
+        // ===== REAL-TIME FOLLOW SYSTEM (Optimistic UI Update) =====
+        function getFollowBtnHtml(vidUserId) {
+            if (!currentUser) return `<div class="follow-badge not-following" onclick="requireAuth()">Follow</div>`;
+            if (vidUserId === currentUser.id) return '';
+            const isFollowing = (currentUser.following || []).includes(vidUserId);
+            return `<div class="follow-badge ${isFollowing ? 'following' : 'not-following'}" id="followBtn_${vidUserId}" onclick="toggleFollow('${vidUserId}', this, event)">${isFollowing ? 'Unfollow' : 'Follow'}</div>`;
+        }
+
+        function toggleFollow(userId, btnElement, event) {
+            if (event) event.stopPropagation();
+            requireAuth(() => {
+                if (userId === currentUser.id) return;
+                let u = getUserData();
+                const isFollowing = u.following.includes(userId);
+
+                // OPTIMISTIC UI UPDATE
+                if (isFollowing) {
+                    u.following = u.following.filter(id => id !== userId);
+                    if (btnElement) { btnElement.innerText = "Follow"; btnElement.classList.remove("following"); btnElement.classList.add("not-following"); }
+                    let followCountEl = document.getElementById(`followersCount_${userId}`);
+                    if (followCountEl) followCountEl.innerText = Math.max(0, parseInt(followCountEl.innerText) - 1);
+                } else {
+                    u.following.push(userId);
+                    if (btnElement) { btnElement.innerText = "Unfollow"; btnElement.classList.remove("not-following"); btnElement.classList.add("following"); }
+                    let followCountEl = document.getElementById(`followersCount_${userId}`);
+                    if (followCountEl) followCountEl.innerText = parseInt(followCountEl.innerText) + 1;
+                }
+                saveUserData(u);
+
+                // BACKGROUND SYNC
+                if (isFollowing) {
+                    db.collection('users').doc(u.id).update({ following: u.following });
+                    db.collection('users').doc(userId).update({ followersArray: firebase.firestore.FieldValue.arrayRemove(u.id) });
+                } else {
+                    db.collection('notifications').add({ type: 'follow', sender: u.username, receiverId: userId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    db.collection('users').doc(u.id).update({ following: u.following });
+                    db.collection('users').doc(userId).update({ followersArray: firebase.firestore.FieldValue.arrayUnion(u.id) });
                 }
             });
+        }
+
+        function openFollowList(type) {
+            const modal = document.getElementById('followListModal');
+            const content = document.getElementById('followListContent');
+            document.getElementById('followListTitle').innerText = type;
+            modal.style.display = 'flex';
+            let u = getUserData();
+            const listIds = type === 'Following' ? (u.following || []) : (u.followersArray || []);
+
+            if (listIds.length === 0) {
+                content.innerHTML = `<p style="text-align:center; padding:20px; color:#888;">No ${type.toLowerCase()} yet.</p>`;
+            } else {
+                content.innerHTML = '';
+                listIds.forEach(id => {
+                    db.collection('users').doc(id).get().then(doc => {
+                        if (doc.exists) {
+                            const usr = doc.data();
+                            let badge = getVerificationBadge(usr.verification || 'none');
+                            let initial = usr.username ? safeStr(usr.username).charAt(0).toUpperCase() : 'U';
+                            let picHtml = (usr.profilePic && usr.profilePic.includes('http')) ? `<img src="${usr.profilePic}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;">` : `<div style="width:45px; height:45px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; color:#000; font-weight:bold; font-size:18px;">${initial}</div>`;
+                            
+                            content.innerHTML += `
+                                <div class="notification-item" onclick="viewUserProfile('${doc.id}', '${safeStr(usr.username)}', '${usr.profilePic}', '${safeStr(usr.bio)}', '${usr.verification}')">
+                                    ${picHtml}
+                                    <div><strong style="color:var(--text);">@${safeStr(usr.username)} ${badge}</strong></div>
+                                </div>`;
+                        }
+                    });
+                });
+            }
+        }
+
+        function viewUserProfile(userId, username, pic, bio, veriStatus) {
+            pauseAllVideos();
+            const modal = document.getElementById('otherProfileModal');
+            const content = document.getElementById('otherProfileContent');
+            document.getElementById('otherProfileTitle').innerText = `@${safeStr(username)}`;
+            modal.style.display = 'flex';
+
+            let isFollowing = (currentUser && currentUser.following && currentUser.following.includes(userId));
+            let badge = getVerificationBadge(veriStatus || 'none');
+            let avatarClass = (veriStatus === 'golden') ? 'vip-frame' : '';
+            let initial = username ? safeStr(username).charAt(0).toUpperCase() : 'U';
+            let picHtml = (pic && pic.includes('http')) ? `<img src="${pic}" class="profile-pic ${avatarClass}">` : `<div class="profile-pic ${avatarClass}" style="display:flex; align-items:center; justify-content:center; font-size:35px; color:#000;">${initial}</div>`;
+
+            content.innerHTML = `
+                <div class="profile-header">
+                    ${picHtml}
+                    <h2>@${safeStr(username)} ${badge}</h2>
+                    <p style="color:var(--muted-text); font-size:14px; margin-top:5px;">${safeStr(bio) || 'No bio available'}</p>
+                    <div class="profile-stats">
+                        <div class="profile-stat-item"><strong id="otherPostCount">0</strong><span>Posts</span></div>
+                        <div class="profile-stat-item"><strong id="followersCount_${userId}">0</strong><span>Followers</span></div>
+                        <div class="profile-stat-item"><strong id="followingCount_${userId}">0</strong><span>Following</span></div>
+                    </div>
+                    ${currentUser && currentUser.id !== userId ? `
+                    <div style="display:flex; justify-content:center; gap:10px; margin-top:10px;">
+                        <button class="primary-btn ${isFollowing ? 'following' : 'not-following'}" style="width: auto; padding: 8px 30px;" onclick="toggleFollow('${userId}', this, event)">${isFollowing ? 'Unfollow' : 'Follow'}</button>
+                        <button class="primary-btn" style="width: auto; padding: 8px 15px; background:var(--secondary-bg); color:var(--primary); border:1px solid var(--primary);" onclick="openGiftModal('${userId}')"><i class="fas fa-gift"></i> Gift</button>
+                    </div>` : ''}
+                </div>
+                <div class="profile-grid" id="otherUserGrid"></div>
+            `;
+
+            // Realtime Fetching of Target user stats
+            db.collection('users').doc(userId).get().then(doc => {
+                if (doc.exists) {
+                    const uData = doc.data();
+                    document.getElementById(`followersCount_${userId}`).innerText = (uData.followersArray || []).length;
+                    document.getElementById(`followingCount_${userId}`).innerText = (uData.following || []).length;
+                }
+            });
+            db.collection('videos').where('userId', '==', userId).get().then(snapshot => {
+                const grid = document.getElementById('otherUserGrid');
+                document.getElementById('otherPostCount').innerText = snapshot.size;
+                snapshot.forEach(doc => {
+                    const vid = doc.data();
+                    grid.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${getThumbUrl(vid.video_url)}" loading="lazy"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                });
+            });
+        }
+
+        // ===== PROFILE UPLOAD / EDIT =====
+        let tempProfileFile = null;
+        function previewProfilePic(input, previewId) { if (input.files && input.files[0]) { tempProfileFile = input.files[0]; document.getElementById(previewId).src = URL.createObjectURL(tempProfileFile); } }
+        async function uploadToCloudinary(file) {
+            const formData = new FormData(); formData.append('file', file); formData.append('upload_preset', 'ml_default');
+            const res = await fetch('https://api.cloudinary.com/v1_1/dtzjo3zdp/image/upload', { method: 'POST', body: formData });
+            const data = await res.json(); return data.secure_url;
+        }
+        async function saveProfile() {
+            const username = document.getElementById('authUsername').value.trim();
+            const bio = document.getElementById('authBio').value.trim();
+            if (!username) return showToast("Username is required!");
+            showLoader();
+            let profileUrl = "https://via.placeholder.com/100";
+            if (tempProfileFile) { try { profileUrl = await uploadToCloudinary(tempProfileFile); } catch (e) {} }
+            const userData = { username: username, bio: bio, profilePic: profileUrl, following: [], followersArray: [], pCoins: 50, earnedCoins: 0, videos: 0, totalViews: 0, verification: 'none', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+            try {
+                const userRef = await db.collection('users').add(userData);
+                userData.id = userRef.id;
+                saveUserData(userData);
+                hideLoader(); closeAuthModal(); showToast("Profile Created Successfully!"); renderProfile();
+            } catch (e) { hideLoader(); showToast("Error creating profile"); }
+        }
+        function openEditProfile() {
+            let u = getUserData();
+            document.getElementById('editUsername').value = u.username; document.getElementById('editBio').value = u.bio;
+            document.getElementById('editPicPreview').src = u.profilePic || "https://via.placeholder.com/100";
+            tempProfileFile = null; document.getElementById('editProfileModal').style.display = 'flex';
+        }
+        async function saveEditedProfile() {
+            let u = getUserData();
+            const username = document.getElementById('editUsername').value.trim(); const bio = document.getElementById('editBio').value.trim();
+            if (!username) return showToast("Username required!");
+            showLoader();
+            let profileUrl = u.profilePic;
+            if (tempProfileFile) { try { profileUrl = await uploadToCloudinary(tempProfileFile); } catch (e) {} }
+            u.username = username; u.bio = bio; u.profilePic = profileUrl;
+            try {
+                await db.collection('users').doc(u.id).update({ username, bio, profilePic: profileUrl });
+                saveUserData(u);
+                hideLoader(); document.getElementById('editProfileModal').style.display = 'none'; showToast("Profile Updated!"); renderProfile();
+            } catch (e) { hideLoader(); showToast("Update failed!"); }
+        }
+
+        // ===== FEED & REAL VIEWS =====
+        function renderSkeletonUI() {
+            let skelHTML = '<div class="video-feed skeleton-feed"><div class="blur-bg"></div>';
+            for (let i = 0; i < 2; i++) {
+                skelHTML += `<div class="pro-skeleton"><div class="sk-top"><span></span><span></span></div><div class="sk-avatar"><div class="circle"></div><div class="rect"></div><div class="rect" style="width:30px;"></div></div><div class="sk-bottom"><div class="line" style="width:60%;"></div><div class="line"></div></div><div class="sk-progress"><div class="bar"></div></div></div>`;
+            }
+            return skelHTML + '</div>';
+        }
+
+        function renderHome(tab = 'foryou') {
+            currentTab = tab; updateNavActive(0); pauseAllVideos();
             
-            console.log("✅ Index.html loaded with all safety features");
+            let requiredDelay = 0; // আর্টিফিশিয়াল ডিলে বন্ধ করা হলো
+            
+            if (isInitialLoad && tab === 'foryou') {
+                isInitialLoad = false;
+            } else {
+                contentDiv.innerHTML = `
+                    <div class="top-tabs-container">
+                        <div class="top-tab ${tab === 'following' ? 'active' : ''}" onclick="renderHome('following')">Following</div>
+                        <div class="top-tab ${tab === 'foryou' ? 'active' : ''}" onclick="renderHome('foryou')">For You</div>
+                    </div>
+                    ${renderSkeletonUI()}
+                `;
+                appLaunchTime = Date.now(); 
+                requiredDelay = 0; 
+            }
+
+            let dataFetched = false;
+
+            function handleFeedRender(videos, targetTab) {
+                renderHomeFeed(videos, targetTab);
+            }
+
+            if (videoCache.length > 0 && tab === 'foryou') { 
+                dataFetched = true;
+                handleFeedRender(videoCache, tab);
+            } else {
+                db.collection('videos').orderBy('createdAt', 'desc').limit(20).get().then(snapshot => {
+                    dataFetched = true;
+                    let videos = [];
+                    snapshot.forEach(doc => videos.push({ id: doc.id, ...doc.data() }));
+                    
+                    if (videos.length === 0) videos.push(demoVideo);
+
+                    if (tab === 'foryou') { videoCache = videos; localStorage.setItem('pikko_video_cache', JSON.stringify(videos)); }
+                    handleFeedRender(videos, tab);
+                }).catch(()=>{ 
+                    dataFetched = true;
+                    if(videoCache.length>0) handleFeedRender(videoCache, tab); 
+                    else handleFeedRender([demoVideo], tab); 
+                });
+            }
+            
+            setTimeout(() => {
+                if(!dataFetched) {
+                    if(videoCache.length>0) handleFeedRender(videoCache, tab); 
+                    else handleFeedRender([demoVideo], tab);
+                }
+            }, Math.max(2500, requiredDelay)); 
+        }
+
+        function renderHomeFeed(videos, tab) {
+            let vids = [...videos];
+            if (tab === 'following' && currentUser) { vids = vids.filter(v => (currentUser.following || []).includes(v.userId)); } 
+            else if (tab === 'foryou') { vids.sort(() => Math.random() - 0.5); }
+
+            if (vids.length === 0) {
+                contentDiv.innerHTML = `<div class="top-tabs-container"><div class="top-tab ${tab === 'following' ? 'active' : ''}" onclick="renderHome('following')">Following</div><div class="top-tab ${tab === 'foryou' ? 'active' : ''}" onclick="renderHome('foryou')">For You</div></div><p style="text-align:center; padding-top:50vh; color:var(--muted-text);">No videos found.</p>`;
+                return;
+            }
+
+            let html = `<div class="top-tabs-container"><div class="top-tab ${tab === 'following' ? 'active' : ''}" onclick="renderHome('following')">Following</div><div class="top-tab ${tab === 'foryou' ? 'active' : ''}" onclick="renderHome('foryou')">For You</div></div><div id="feedContainer" class="video-feed">`;
+
+            vids.forEach(vid => {
+                const isSaved = (currentUser?.saved || []).includes(vid.id);
+                const initial = vid.username ? safeStr(vid.username).charAt(0).toUpperCase() : 'U';
+                const avatarClass = (vid.verification === 'golden') ? 'vip-frame' : '';
+                const badge = getVerificationBadge(vid.verification);
+                
+                // Profile Pic Fix everywhere
+                const avatarContent = (vid.userPic && vid.userPic.includes('http')) ? 
+                    `<img src="${vid.userPic}" class="${avatarClass}" style="width:100%;height:100%;object-fit:cover;">` : 
+                    `<div class="video-avatar-initial ${avatarClass}" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">${initial}</div>`;
+                
+                // Poster Fix for Black Screen
+                const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
+
+                html += `
+                    <div class="video-card">
+                        <video class="video-player" data-src="${getOptimizedVideoUrl(vid.video_url)}" poster="${posterUrl}" loop playsinline preload="none" id="vid_${vid.id}"></video>
+                        <div class="insta-buffer" id="buf_${vid.id}"></div>
+                        <div class="center-play-btn" id="playBtn_${vid.id}"><i class="fas fa-play"></i></div>
+
+                        <div class="right-sidebar">
+                            <div class="video-avatar-container" onclick="viewUserProfile('${vid.userId}', '${safeStr(vid.username)}', '${vid.userPic}', '${safeStr(vid.bio)}', '${vid.verification}')">
+                                ${avatarContent}
+                            </div>
+                            <div class="action-btn" id="likeBtn_${vid.id}" onclick="toggleLike('${vid.id}')">
+                                <i class="fas fa-heart"></i>
+                                <span id="likeCount_${vid.id}">${vid.likes_count || 0}</span>
+                            </div>
+                            <div class="action-btn">
+                                <i class="fas fa-eye"></i>
+                                <span>${vid.views_count || 0}</span>
+                            </div>
+                            <div class="action-btn" onclick="openComments('${vid.id}')">
+                                <i class="fas fa-comment-dots"></i>
+                                <span id="cmtCount_${vid.id}">${vid.comment_count || 0}</span>
+                            </div>
+                            <div class="action-btn ${isSaved ? 'saved' : ''}" id="saveBtn_${vid.id}" onclick="toggleSave('${vid.id}')">
+                                <i class="fas fa-bookmark"></i>
+                                <span>Save</span>
+                            </div>
+                            <div class="action-btn" onclick="openGiftModal('${vid.userId}')">
+                                <i class="fas fa-gift" style="color:var(--primary);"></i>
+                                <span>Gift</span>
+                            </div>
+                        </div>
+
+                        <div class="video-overlay">
+                            <h3 onclick="viewUserProfile('${vid.userId}', '${safeStr(vid.username)}', '${vid.userPic}', '${safeStr(vid.bio)}', '${vid.verification}')">@${safeStr(vid.username) || 'user'} ${badge}</h3>
+                            <div style="margin-bottom: 5px;">${getFollowBtnHtml(vid.userId)}</div>
+                            <p>${safeStr(vid.caption) || ''}</p>
+                        </div>
+                        <div class="video-progress-container" onclick="seekVideo(event, this)">
+                            <div class="video-progress-bar"></div>
+                        </div>
+                    </div>`;
+            });
+            html += `</div>`;
+            contentDiv.innerHTML = html;
+            setupVideoListeners();
+            initObserver();
+        }
+
+        let lastTap = 0;
+        function setupVideoListeners() {
+            const videos = document.querySelectorAll('.video-player');
+            videos.forEach(video => {
+                const bar = video.parentElement.querySelector('.video-progress-bar');
+                const buf = video.parentElement.querySelector('.insta-buffer');
+                const playBtn = video.parentElement.querySelector('.center-play-btn');
+                const vidId = video.id.replace('vid_', '');
+
+                video.addEventListener('timeupdate', () => { if (video.duration) bar.style.width = ((video.currentTime / video.duration) * 100) + '%'; });
+                video.addEventListener('waiting', () => buf.style.display = 'block');
+                video.addEventListener('playing', () => { buf.style.display = 'none'; playBtn.style.display = 'none'; });
+                video.addEventListener('canplay', () => buf.style.display = 'none');
+                
+                // Real Views Fix: Increment only once per session
+                video.addEventListener('play', () => {
+                    if(!video.dataset.viewCounted) {
+                        video.dataset.viewCounted = 'true';
+                        let u = getUserData();
+                        if(u) { u.totalViews += 1; saveUserData(u); }
+                        const viewsSpan = video.parentElement.querySelector('.fa-eye').nextElementSibling;
+                        if(viewsSpan) { viewsSpan.innerText = parseInt(viewsSpan.innerText) + 1; }
+                        
+                        // Fire Background DB Update
+                        db.collection('videos').doc(vidId).update({ views_count: firebase.firestore.FieldValue.increment(1) }).catch(e=>{});
+                    }
+                    if(playBtn) playBtn.style.display = 'none';
+                });
+                video.addEventListener('pause', () => playBtn.style.display = 'block');
+
+                // Double Tap Fix
+                let clickTimer = null;
+                video.addEventListener('click', (e) => {
+                    if (clickTimer == null) {
+                        clickTimer = setTimeout(() => {
+                            clickTimer = null;
+                            if (video.paused) { video.muted = false; video.play().catch(e=>{}); } 
+                            else { video.pause(); }
+                        }, 300);
+                    } else {
+                        clearTimeout(clickTimer);
+                        clickTimer = null;
+                        showDoubleTapHearts(e);
+                        toggleLike(vidId, true);
+                    }
+                });
+
+                if(playBtn) playBtn.addEventListener('click', () => { video.muted = false; video.play(); });
+            });
+        }
+
+        function showDoubleTapHearts(e) {
+            for (let i = 0; i < 4; i++) {
+                const heart = document.createElement('i'); heart.className = 'fas fa-heart floating-heart';
+                const offsetX = (Math.random() - 0.5) * 80; const offsetY = (Math.random() - 0.5) * 80;
+                heart.style.left = (e.clientX - 30 + offsetX) + 'px'; heart.style.top = (e.clientY - 30 + offsetY) + 'px';
+                heart.style.animationDelay = (i * 0.1) + 's'; document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 1200);
+            }
+        }
+        function seekVideo(event, container) { const video = container.parentElement.querySelector('.video-player'); const rect = container.getBoundingClientRect(); const pos = (event.clientX - rect.left) / rect.width; video.currentTime = pos * video.duration; }
+
+        function toggleSave(videoId) {
+            requireAuth(() => {
+                let u = getUserData();
+                if (!u.saved) u.saved = [];
+                const btn = document.getElementById(`saveBtn_${videoId}`);
+                const isSaved = u.saved.includes(videoId);
+                if (isSaved) { u.saved = u.saved.filter(id => id !== videoId); btn.classList.remove('saved'); showToast("Removed from saved"); } 
+                else { u.saved.push(videoId); btn.classList.add('saved'); showToast("Saved to profile!"); }
+                saveUserData(u); db.collection('users').doc(u.id).update({ saved: u.saved });
+            });
+        }
+
+        function toggleLike(videoId, forceLike = false) {
+            requireAuth(() => {
+                const btn = document.getElementById(`likeBtn_${videoId}`);
+                const countSpan = document.getElementById(`likeCount_${videoId}`);
+                let currentLikes = parseInt(countSpan.innerText);
+                const isLiked = btn.classList.contains('liked');
+                if (forceLike && isLiked) return;
+
+                if (isLiked) { btn.classList.remove('liked'); currentLikes--; } 
+                else {
+                    btn.classList.add('liked'); currentLikes++;
+                    db.collection('videos').doc(videoId).update({ likes_count: firebase.firestore.FieldValue.increment(1) });
+                    db.collection('notifications').add({ type: 'like', sender: currentUser.username, videoId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                }
+                countSpan.innerText = currentLikes;
+            });
+        }
+
+        // ===== COMMENTS & GIFTS =====
+        let currentCommentVid = null;
+        function openComments(vidId) {
+            currentCommentVid = vidId; document.getElementById('commentModal').style.display = 'flex';
+            const list = document.getElementById('commentList'); list.innerHTML = '<p style="text-align:center; padding:20px; color:var(--muted-text);">Loading comments...</p>';
+            db.collection('comments').where('videoId', '==', vidId).get().then(snap => {
+                list.innerHTML = ''; 
+                if (snap.empty) { list.innerHTML = '<p style="text-align:center;color:#888; padding: 20px;">No comments yet.</p>'; return; }
+                snap.forEach(doc => {
+                    let c = doc.data();
+                    list.innerHTML += `
+                        <div style="display:flex; gap:10px; margin-bottom:15px; padding: 0 15px;">
+                            <div style="width:35px;height:35px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;">
+                                <b>${safeStr(c.sender).charAt(0).toUpperCase()}</b>
+                            </div>
+                            <div><p style="font-size:12px;color:var(--muted-text);">@${safeStr(c.sender)}</p><p style="font-size:14px;">${safeStr(c.text)}</p></div>
+                        </div>`;
+                });
+            }).catch(e => {
+                list.innerHTML = '<p style="text-align:center;color:#888; padding: 20px;">No comments yet.</p>';
+            });
+        }
+        function postComment() {
+            requireAuth(() => {
+                const text = document.getElementById('commentInput').value.trim();
+                if (!text || !currentCommentVid) return;
+                db.collection('comments').add({ videoId: currentCommentVid, sender: currentUser.username, text, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                db.collection('videos').doc(currentCommentVid).update({ comment_count: firebase.firestore.FieldValue.increment(1) });
+                db.collection('notifications').add({ type: 'comment', sender: currentUser.username, videoId: currentCommentVid, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                document.getElementById('commentInput').value = ''; openComments(currentCommentVid);
+            });
+        }
+        
+        let targetCreatorId = null;
+        function openGiftModal(creatorId) {
+            requireAuth(() => {
+                let u = getUserData();
+                targetCreatorId = creatorId;
+                document.getElementById('myCoinBal').innerText = u.pCoins || 0;
+                const grid = document.getElementById('stickerGrid'); grid.innerHTML = '';
+                stickers.forEach(s => { grid.innerHTML += `<div class="sticker-item" onclick="sendGift(${s.coins}, '${s.icon}')"><div style="font-size:30px;">${s.icon}</div><div style="font-size:12px; font-weight:bold; color:var(--primary); margin-top:5px;">${s.coins}</div></div>`; });
+                document.getElementById('giftModal').style.display = 'flex';
+            });
+        }
+        function sendGift(cost, icon) {
+            let u = getUserData();
+            if ((u.pCoins || 0) < cost) { showToast("Insufficient Coins!"); document.getElementById('giftModal').style.display = 'none'; openWallet(); return; }
+            u.pCoins -= cost;
+            saveUserData(u);
+            db.collection('users').doc(u.id).update({ pCoins: u.pCoins });
+            if (targetCreatorId) {
+                // Update Target User DB
+                db.collection('users').doc(targetCreatorId).update({ earnedCoins: firebase.firestore.FieldValue.increment(cost) });
+                db.collection('notifications').add({ type: 'gift', sender: u.username, receiverId: targetCreatorId, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+            }
+            document.getElementById('giftModal').style.display = 'none'; showToast(`Sent ${icon} Gift successfully!`);
+        }
+
+        // ===== PROFESSIONAL WALLET & PAYMENT GATEWAY =====
+        function openWallet() { 
+            document.getElementById('walletFullScreenPage').style.display = 'flex'; 
+            showLoader();
+            let u = getUserData();
+            
+            // FIX: Refresh latest coins directly from DB when Wallet is opened
+            db.collection('users').doc(u.id).get().then(doc => {
+                if(doc.exists) {
+                    let d = doc.data();
+                    u.pCoins = d.pCoins || 0;
+                    u.earnedCoins = d.earnedCoins || 0;
+                    saveUserData(u);
+                }
+                hideLoader();
+                renderWalletContent();
+            }).catch(() => { hideLoader(); renderWalletContent(); });
+        }
+        function closeWallet() { document.getElementById('walletFullScreenPage').style.display = 'none'; }
+
+        function renderWalletContent() {
+            let u = getUserData();
+            let dailyFreeCoin = u.verification === 'golden' ? 7 : (u.verification === 'blue' ? 5 : 2);
+            let monetizeEarnedINR = u.verification === 'golden' ? (u.totalViews * 0.1) : 0; // 1000 Views = 100 Rs => 1 View = 0.1 Rs
+            let totalBalanceINR = ((u.earnedCoins || 0) / 10) + monetizeEarnedINR;
+            let historyHTML = u.history.length === 0 ? '<p style="text-align:center; color:#555; padding:20px;">No transaction history.</p>' : u.history.map(h => `<div class="history-item"><div><div class="history-title">${h.title}</div><div class="history-date">${h.date}</div></div><div class="history-amt ${h.type}">${h.amt}</div></div>`).join('');
+
+            // Daily Coin Logic UI Fix
+            let lastClaim = localStorage.getItem('lastClaimDate');
+            let today = new Date().toDateString();
+            let isClaimed = (lastClaim === today);
+            let claimBtnHtml = isClaimed ? 
+                `<div style="background:var(--input-bg); padding:15px; border-radius:12px; text-align:center; color:#888; font-weight:bold; margin-bottom:20px; border:1px solid #333;">
+                    <i class="fas fa-check-circle" style="font-size:20px;"></i> Claimed Today
+                </div>` : 
+                `<div onclick="claimDailyCoins(${dailyFreeCoin})" style="background:linear-gradient(45deg, #FFD700, #FFA500); padding:15px; border-radius:12px; text-align:center; color:#000; font-weight:bold; cursor:pointer; margin-bottom:20px; box-shadow:0 5px 15px rgba(255,215,0,0.3);">
+                    <i class="fas fa-gift" style="font-size:20px;"></i> Claim Daily ${dailyFreeCoin} Free Coins
+                </div>`;
+
+            const area = document.getElementById('walletContentArea');
+            area.style.padding = '0';
+            area.innerHTML = `
+                <div class="wallet-tabs" style="display:flex; justify-content:space-around; background:#1a1a1a; padding:10px; border-radius:10px; margin:15px; position:relative;">
+                    <div class="wallet-tab active" id="wtab1" onclick="switchWalletTabModal(1, this)" style="cursor:pointer; color:var(--primary); font-weight:bold;">Earnings</div>
+                    <div class="wallet-tab" id="wtab2" onclick="switchWalletTabModal(2, this)" style="cursor:pointer; color:#888;">P-Coins</div>
+                    <div class="wallet-tab" id="wtab3" onclick="switchWalletTabModal(3, this)" style="cursor:pointer; color:#888;">History</div>
+                </div>
+                
+                <div id="walletTab1" style="padding: 15px;">
+                    <div class="wallet-card-pro">
+                        <span style="color:#aaa; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Withdrawable Balance</span>
+                        <h2 style="font-size:42px; color:#fff; margin:10px 0; text-shadow:0 2px 4px rgba(0,0,0,0.5);">₹ ${totalBalanceINR.toFixed(2)}</h2>
+                        <div style="font-size:11px; color:#888;">(Includes Monetization if Golden Tick active)</div>
+                        <button class="primary-btn" style="margin-top:15px; background:linear-gradient(90deg, #4CAF50, #2E7D32); color:#fff; box-shadow:0 4px 15px rgba(76,175,80,0.4);" onclick="requestWithdraw(${totalBalanceINR})"><i class="fas fa-university"></i> Withdraw (Min ₹100)</button>
+                    </div>
+                </div>
+
+                <div id="walletTab2" style="display:none; padding: 15px;">
+                    <div style="background:var(--input-bg); border:1px solid #444; border-radius:12px; padding:20px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; box-shadow:0 5px 15px rgba(0,0,0,0.5);">
+                        <div><span style="color:#aaa; font-size:12px; text-transform:uppercase;">Available Coins</span><h3 style="color:var(--primary); font-size:32px; margin:0;">${u.pCoins}</h3></div>
+                        <i class="fas fa-coins" style="font-size:40px; color:var(--primary); text-shadow:0 0 15px rgba(255,215,0,0.5);"></i>
+                    </div>
+                    
+                    ${claimBtnHtml}
+
+                    <h3 style="margin-top:20px; font-size:16px; margin-bottom:15px;">Premium Top-Up Packs</h3>
+                    <div id="rechargeList" style="display:grid; grid-template-columns:1fr 1fr; gap:15px;"></div>
+                </div>
+                
+                <div id="walletTab3" style="display:none; padding: 10px; max-height:450px; overflow-y:auto; margin:15px; background:#111; border-radius:10px;">
+                    ${historyHTML}
+                </div>`;
+                
+            const rList = document.getElementById('rechargeList');
+            rechargePacks.forEach(pack => { 
+                rList.innerHTML += `
+                    <div class="recharge-pack-pro">
+                        <div>
+                            <div class="pack-coins"><i class="fas fa-coins"></i> ${pack.coins}</div>
+                            <div class="pack-bonus">${pack.bonus}</div>
+                        </div>
+                        <button class="primary-btn" onclick="openPaymentGateway('recharge', ${pack.price}, '${pack.coins} P-Coins')" style="padding:10px; font-size:14px; box-shadow:0 2px 10px rgba(255,215,0,0.2);">Pay ₹${pack.price}</button>
+                    </div>`; 
+            });
+        }
+
+        function switchWalletTabModal(tabId, el) {
+            document.getElementById('walletTab1').style.display = 'none'; document.getElementById('walletTab2').style.display = 'none'; document.getElementById('walletTab3').style.display = 'none';
+            document.getElementById('walletTab' + tabId).style.display = 'block';
+            document.querySelectorAll('.wallet-tab').forEach(t => { t.style.color = '#888'; t.classList.remove('active'); });
+            el.style.color = 'var(--primary)'; el.classList.add('active');
+        }
+
+        // Firebase Sync logic for Daily Coins
+        function claimDailyCoins(amount) {
+            let lastClaim = localStorage.getItem('lastClaimDate');
+            let today = new Date().toDateString();
+            if(lastClaim === today) { showToast("Already claimed today!"); return; }
+            
+            let u = getUserData();
+            u.pCoins += amount;
+            
+            // Sync with Firebase Database
+            db.collection('users').doc(u.id).update({ pCoins: firebase.firestore.FieldValue.increment(amount) });
+            
+            addHistory("Daily Free Claim", `+${amount} Coins`, "positive");
+            localStorage.setItem('lastClaimDate', today);
+            saveUserData(u);
+            showToast(`${amount} Coins claimed!`);
+            renderWalletContent();
+        }
+
+        function requestWithdraw(balance) {
+            if(balance < 100) { showToast("Minimum withdrawal is ₹100"); return; }
+            
+            showCustomPrompt("Withdraw Funds", `Available: ₹${balance.toFixed(2)}`, "Enter Amount (e.g. 500)", true, (data) => {
+                const amount = parseFloat(data.amount);
+                if(isNaN(amount) || amount > balance || amount < 100) return showToast("Invalid amount.");
+                
+                let u = getUserData();
+                addHistory("Withdrawal Request", `-₹${amount}`, "pending");
+                let withdrawReqs = getMockDB('pikko_withdraws');
+                withdrawReqs.unshift({ id: Date.now(), userId: u.id, username: u.username, amount: amount, upi: data.upi, status: 'pending', date: new Date().toLocaleString() });
+                saveMockDB('pikko_withdraws', withdrawReqs);
+                
+                showToast("Request sent to Admin successfully!"); renderWalletContent();
+            });
+        }
+
+        // UNIVERSAL PAYMENT GATEWAY
+        let currentPaymentType = ''; let currentPaymentAmount = 0; let currentPaymentDesc = '';
+
+        function openPaymentGateway(type, amount, desc) {
+            currentPaymentType = type; currentPaymentAmount = amount; currentPaymentDesc = desc;
+            document.getElementById('payAmountTxt').innerText = amount;
+            document.getElementById('payDescTxt').innerText = desc;
+            document.getElementById('txnIdInput').value = '';
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+
+        function submitPaymentRequest() {
+            const txnId = document.getElementById('txnIdInput').value.trim();
+            if (txnId.length < 8) return showToast("Enter a valid Transaction ID!");
+            
+            let u = getUserData();
+            addHistory(`${currentPaymentDesc} Order`, `-₹${currentPaymentAmount}`, "pending");
+            
+            let recharges = getMockDB('pikko_recharges');
+            recharges.unshift({ id: Date.now(), userId: u.id, username: u.username, txnId: txnId, coins: currentPaymentDesc.split(' ')[0], desc: currentPaymentDesc, paymentType: currentPaymentType, status: 'pending', date: new Date().toLocaleString() });
+            saveMockDB('pikko_recharges', recharges);
+            
+            document.getElementById('paymentModal').style.display = 'none';
+            showToast("Payment sent for Admin verification. Please wait.");
+            if(document.getElementById('walletFullScreenPage').style.display === 'flex') renderWalletContent();
+        }
+
+        function copyUpi() { navigator.clipboard.writeText("8391921082@ibl"); showToast("UPI ID Copied!"); }
+
+        // ===== CREATOR HUB & VERIFICATION =====
+        function openMonetizationPage() {
+            let u = getUserData();
+            if(u.verification !== 'golden') return showToast("Requires Golden Tick for Monetization!");
+            document.getElementById('monEarn').innerText = (u.totalViews * 0.1).toFixed(2); // 1000 Views = 100 Rs.
+            openModal('monetizeModal');
+        }
+
+        document.getElementById('verifyModal').addEventListener('DOMNodeInserted', function() {
+            let u = getUserData();
+            let btn = document.getElementById('goldenSubBtn');
+            if(btn) {
+                let cost = u.hasTrial ? 99 : 10;
+                btn.innerText = `Subscribe (₹${cost})`;
+            }
+        });
+
+        // Manual Data Sync Button Logic
+        function syncAnalyzeData() {
+            showLoader();
+            let u = getUserData();
+            
+            db.collection('users').doc(u.id).get().then(doc => {
+                if(doc.exists) {
+                    let d = doc.data();
+                    let followerCount = d.followersArray ? d.followersArray.length : 0;
+                    u.followersArray = d.followersArray || [];
+                    
+                    db.collection('videos').where('userId', '==', u.id).get().then(snap => {
+                        let totalViews = 0;
+                        let totalVids = snap.size;
+                        snap.forEach(v => { totalViews += (v.data().views_count || 0); });
+                        
+                        u.totalViews = totalViews;
+                        u.videos = totalVids;
+                        u.verification = d.verification || 'none';
+                        saveUserData(u);
+                        
+                        document.getElementById('anaFollow').innerText = followerCount;
+                        document.getElementById('anaViews').innerText = totalViews;
+                        document.getElementById('anaEarn').innerText = '₹' + (u.verification === 'golden' ? (totalViews * 0.1).toFixed(2) : '0');
+                        hideLoader();
+                        showToast("Data synced successfully!");
+                    }).catch(()=>{hideLoader();});
+                }
+            }).catch(()=>{hideLoader();});
+        }
+
+        document.getElementById('analyzeModal').addEventListener('DOMNodeInserted', function() {
+            let u = getUserData();
+            document.getElementById('anaFollow').innerText = (u.followersArray || []).length; 
+            document.getElementById('anaViews').innerText = u.totalViews;
+            document.getElementById('anaEarn').innerText = '₹' + (u.verification === 'golden' ? (u.totalViews * 0.1).toFixed(2) : '0');
+        });
+
+        function applyVerification(type) {
+            let u = getUserData();
+            if(type === 'white') {
+                if((u.followersArray || []).length >= 10 && u.videos >= 10) { 
+                    u.verification = 'white'; 
+                    db.collection('users').doc(u.id).update({ verification: 'white' });
+                    updateAllUserVideos(u.id, 'white');
+                    showToast("White Tick Applied!"); 
+                } 
+                else showCustomPrompt("Failed", "Requirement not met.", "Need 10 Followers & 10 Videos.", false, null);
+            } else if(type === 'blue') {
+                if((u.followersArray || []).length >= 50 && u.videos >= 20) {
+                    if(u.pCoins >= 50) { 
+                        u.pCoins -= 50; u.verification = 'blue'; 
+                        db.collection('users').doc(u.id).update({ verification: 'blue', pCoins: u.pCoins });
+                        updateAllUserVideos(u.id, 'blue');
+                        addHistory("Bought Blue Tick", "-50 P-Coins", "negative"); showToast("Blue Tick Activated!"); 
+                    } 
+                    else showCustomPrompt("Failed", "Not enough coins.", "You need 50 P-Coins.", false, null);
+                } else showCustomPrompt("Failed", "Requirement not met.", "Need 50 Followers & 20 Videos.", false, null);
+            } else if(type === 'golden') {
+                let cost = u.hasTrial ? 99 : 10;
+                closeModal('verifyModal');
+                openPaymentGateway('golden_sub', cost, 'Golden Tick Sub');
+            }
+            saveUserData(u);
+        }
+
+        // Batch update user's videos for globally updating ticks
+        function updateAllUserVideos(userId, tickType) {
+            db.collection('videos').where('userId', '==', userId).get().then(snap => {
+                snap.forEach(v => { v.ref.update({ verification: tickType }); });
+            });
+        }
+
+        // ===== CAMERA HD + CANVAS FILTERS & UPLOAD =====
+        let currentCamMode = "user"; let camAudio = document.getElementById('camAudioPlayer'); 
+        let streamRecorder, recordedVidBlob;
+        let camCanvas = document.getElementById('cameraStream');
+        let camCtx = camCanvas.getContext('2d', { alpha: false });
+        let rawVideo = document.getElementById('cameraStreamRaw');
+        let animationFrameId;
+        let currentFilter = 'none';
+        
+        function handleLocalMusic(input) { if (input.files && input.files[0]) { camAudio.src = URL.createObjectURL(input.files[0]); showToast("Music selected! Tap record to lip-sync."); } }
+        
+        function openCamera() {
+            pauseAllVideos(); document.getElementById('cameraModal').style.display = 'flex';
+            startStreamHD();
+        }
+        function startStreamHD() {
+            const constraints = { video: { facingMode: currentCamMode, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: true };
+            navigator.mediaDevices.getUserMedia(constraints).then(stream => {
+                rawVideo.srcObject = stream;
+                
+                // Draw to Canvas
+                rawVideo.onloadedmetadata = () => {
+                    camCanvas.width = rawVideo.videoWidth;
+                    camCanvas.height = rawVideo.videoHeight;
+                    drawCanvasFrame();
+                };
+
+                // Record from Canvas
+                const canvasStream = camCanvas.captureStream(30); // 30 FPS
+                
+                // Mix Audio
+                const audioTracks = stream.getAudioTracks();
+                if(audioTracks.length > 0) { canvasStream.addTrack(audioTracks[0]); }
+                
+                streamRecorder = new MediaRecorder(canvasStream, { mimeType: 'video/webm;codecs=vp8,opus' }); 
+                let chunks = [];
+                streamRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+                streamRecorder.onstop = () => {
+                    recordedVidBlob = new Blob(chunks, { type: 'video/mp4' });
+                    stream.getTracks().forEach(t => t.stop());
+                    cancelAnimationFrame(animationFrameId);
+                    showReviewScreen(recordedVidBlob);
+                };
+            }).catch(err => showToast("Camera access denied."));
+        }
+        
+        function drawCanvasFrame() {
+            camCtx.filter = currentFilter;
+            camCtx.drawImage(rawVideo, 0, 0, camCanvas.width, camCanvas.height);
+            animationFrameId = requestAnimationFrame(drawCanvasFrame);
+        }
+
+        function toggleFilterTray() {
+            const tray = document.getElementById('filterTray');
+            tray.style.display = tray.style.display === 'flex' ? 'none' : 'flex';
+        }
+        
+        function applyCamFilter(filterString, el) {
+            currentFilter = filterString;
+            document.querySelectorAll('.filter-option').forEach(f => f.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function switchCamera() {
+            currentCamMode = (currentCamMode === "user") ? "environment" : "user";
+            const stream = rawVideo.srcObject;
+            if (stream) stream.getTracks().forEach(track => track.stop());
+            cancelAnimationFrame(animationFrameId);
+            startStreamHD();
+        }
+        function closeCamera() { 
+            const stream = rawVideo.srcObject; 
+            if (stream) stream.getTracks().forEach(track => track.stop()); 
+            cancelAnimationFrame(animationFrameId);
+            document.getElementById('cameraModal').style.display = 'none'; 
+            renderHome(currentTab); 
+        }
+
+        function captureVideo() {
+            if (!streamRecorder) return;
+            const btn = document.getElementById('cameraRecordInner');
+            if (streamRecorder.state === 'inactive') {
+                streamRecorder.start(); btn.classList.add('recording'); showToast("Recording...");
+                if(camAudio.src) { camAudio.currentTime = 0; camAudio.play(); } 
+            } else {
+                streamRecorder.stop(); btn.classList.remove('recording'); showToast("Processing video..."); camAudio.pause();
+            }
+        }
+        function handleGalleryVideo(input) { if (input.files && input.files[0]) { closeCamera(); openUploadPreview(input.files[0]); } }
+        
+        function showReviewScreen(blob) {
+            const rv = document.getElementById('cameraReview'); rv.style.display = 'flex'; document.getElementById('reviewVideo').src = URL.createObjectURL(blob);
+        }
+        function cancelReview() { document.getElementById('cameraReview').style.display = 'none'; startStreamHD(); }
+        function proceedToUpload() { document.getElementById('cameraModal').style.display = 'none'; document.getElementById('cameraReview').style.display = 'none'; openUploadPreview(recordedVidBlob); }
+
+        let selectedFile = null;
+        function openUploadPreview(blobOrFile) { selectedFile = blobOrFile; document.getElementById('uploadFullScreenPage').style.display = 'flex'; document.getElementById('uploadPreviewVideo').src = URL.createObjectURL(selectedFile); document.getElementById('uploadCaption').value = ''; }
+        function closeUploadPage() { document.getElementById('uploadFullScreenPage').style.display = 'none'; document.getElementById('uploadPreviewVideo').pause(); renderHome(currentTab); }
+
+        function startVideoUpload() {
+            if (!selectedFile) return showToast("No video selected");
+            const caption = document.getElementById('uploadCaption').value;
+            closeUploadPage(); showLoader();
+            const formData = new FormData(); formData.append('file', selectedFile); formData.append('upload_preset', 'ml_default');
+            const xhr = new XMLHttpRequest(); xhr.open('POST', 'https://api.cloudinary.com/v1_1/dtzjo3zdp/video/upload', true);
+            xhr.onload = async function() {
+                hideLoader();
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    await db.collection('videos').add({
+                        video_url: data.secure_url, caption: caption || '', username: currentUser.username, userId: currentUser.id, userPic: currentUser.profilePic || '', bio: currentUser.bio || '', likes_count: 0, comment_count: 0, views_count: 0, verification: currentUser.verification, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast("Uploaded Successfully!"); fetchBackgroundVideos(); setTimeout(() => renderHome(), 1000);
+                } else { showToast("Upload failed."); }
+            };
+            xhr.onerror = function() { hideLoader(); showToast("Network error."); }; xhr.send(formData);
+        }
+
+        // ===== EXPLORE, SEARCH =====
+        function renderExplore() {
+            updateNavActive(1); pauseAllVideos();
+            contentDiv.innerHTML = `
+                <div class="search-bar" style="border-bottom: 1px solid var(--border);">
+                    <div style="flex:1; display:flex; align-items:center; background:var(--input-bg); border-radius:20px; padding:0 15px;">
+                        <input type="text" id="exploreSearchInputActual" placeholder="Search creators..." style="flex:1; background:transparent; border:none; color:white; outline:none; padding:12px 0;" onclick="openSearchOverlay()" readonly>
+                        <i class="fas fa-search" style="color:var(--primary); cursor:pointer;"></i>
+                    </div>
+                </div>
+                <div class="section-title">Popular Videos</div>
+                <div class="explore-grid-container" id="exploreGridContainer">
+                    <div class="explore-grid" id="exploreFeed">
+                        ${Array(9).fill(0).map(() => `<div class="grid-item" style="background:#111; aspect-ratio:9/16;"><div style="width:100%;height:100%;background:linear-gradient(135deg,#1a1a1a,#2a2a2a);"></div></div>`).join('')}
+                    </div>
+                </div>
+            `;
+            db.collection('videos').orderBy('likes_count', 'desc').limit(9).get().then(snapshot => {
+                const feed = document.getElementById('exploreFeed'); feed.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const vid = doc.data();
+                    const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
+                    feed.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                });
+            }).catch(err => { console.log(err); });
+        }
+        
+        function openSearchOverlay() { document.getElementById('searchOverlay').style.display = 'flex'; document.getElementById('overlaySearchInput').focus(); document.getElementById('overlaySearchResults').innerHTML = ''; }
+        function closeSearchOverlay() { document.getElementById('searchOverlay').style.display = 'none'; }
+        function performSearch(query) {
+            const results = document.getElementById('overlaySearchResults');
+            if (query.length < 2) { results.innerHTML = ''; return; }
+            db.collection('users').where('username', '>=', query).where('username', '<=', query + '\uf8ff').get().then(snapshot => {
+                results.innerHTML = '';
+                if (snapshot.empty) { results.innerHTML = '<p style="color:#888; text-align:center;">No users found.</p>'; return; }
+                snapshot.forEach(doc => {
+                    const u = doc.data(); let badge = getVerificationBadge(u.verification || 'none');
+                    const initial = u.username ? safeStr(u.username).charAt(0).toUpperCase() : 'U';
+                    const picHtml = (u.profilePic && u.profilePic.includes('http')) ? `<img src="${u.profilePic}" style="width:45px; height:45px; border-radius:50%; object-fit:cover;">` : `<div style="width:45px; height:45px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; color:#000; font-weight:bold; font-size:18px;">${initial}</div>`;
+                    results.innerHTML += `<div class="notification-item" onclick="viewUserProfile('${doc.id}', '${safeStr(u.username)}', '${u.profilePic}', '${safeStr(u.bio)}', '${u.verification}'); closeSearchOverlay();">${picHtml}<div><strong style="color:var(--text);">@${safeStr(u.username)} ${badge}</strong></div></div>`;
+                });
+            });
+        }
+
+        function openExploreVideo(id, url, user, cap) {
+            const modal = document.getElementById('videoPlayerModal'); const container = document.getElementById('exploreVideoContainer');
+            container.innerHTML = `<div class="video-card"><video class="video-player" src="${url}" loop playsinline autoplay onclick="this.paused?this.play():this.pause()"></video><div class="right-sidebar"><div class="action-btn" onclick="toggleLike('${id}')"><i class="fas fa-heart"></i><span>Like</span></div><div class="action-btn" onclick="openComments('${id}')"><i class="fas fa-comment-dots"></i><span>Comment</span></div></div><div class="video-overlay"><h3>@${safeStr(user)}</h3><p>${safeStr(cap)}</p></div></div>`;
+            modal.style.display = 'flex';
+        }
+        function closeExploreVideo() { document.getElementById('videoPlayerModal').style.display = 'none'; document.getElementById('exploreVideoContainer').innerHTML = ''; }
+
+        function renderNotify() {
+            updateNavActive(3); pauseAllVideos();
+            contentDiv.innerHTML = `<div class="header-bar" style="border-bottom: 1px solid var(--border);"><h2>Notifications</h2><div style="width:24px;"></div></div><div id="notifList" style="overflow-y:auto; height:calc(100% - 60px);"></div>`;
+            const list = document.getElementById('notifList'); list.innerHTML = '<p style="text-align:center; padding:20px; color:#888;">Loading...</p>';
+            db.collection('notifications').orderBy('createdAt', 'desc').limit(25).get().then(snapshot => {
+                list.innerHTML = '';
+                if (snapshot.empty) { list.innerHTML = '<p style="text-align:center; padding:20px; color:#888;">No notifications.</p>'; return; }
+                snapshot.forEach(doc => {
+                    const n = doc.data(); let icon = 'fa-bell'; let text = `<strong>@${safeStr(n.sender)}</strong> interacted.`;
+                    if (n.type === 'like') { icon = 'fa-heart'; text = `<strong>@${safeStr(n.sender)}</strong> liked your video.`; } 
+                    else if (n.type === 'comment') { icon = 'fa-comment'; text = `<strong>@${safeStr(n.sender)}</strong> commented on your video.`; } 
+                    else if (n.type === 'follow') { icon = 'fa-user-plus'; text = `<strong>@${safeStr(n.sender)}</strong> started following you.`; } 
+                    else if (n.type === 'gift') { icon = 'fa-gift'; text = `<strong>@${safeStr(n.sender)}</strong> sent you a gift!`; }
+                    list.innerHTML += `<div class="notification-item"><div class="notification-icon"><i class="fas ${icon}" style="color:var(--primary);"></i></div><div><p style="font-size:14px;">${text}</p></div></div>`;
+                });
+            });
+        }
+
+        // Real-time follow fix: ensure profile updates on own page load
+        function renderProfile() {
+            updateNavActive(4); pauseAllVideos();
+            let u = getUserData();
+            
+            // Re-fetch profile to fix follower count issue immediately
+            db.collection('users').doc(u.id).get().then(doc => {
+                if(doc.exists) {
+                    let d = doc.data();
+                    u.followersArray = d.followersArray || [];
+                    u.following = d.following || [];
+                    saveUserData(u);
+                }
+                
+                let badge = getVerificationBadge(u.verification);
+                let avatarClass = (u.verification === 'golden') ? 'vip-frame' : '';
+                let initial = u.username ? safeStr(u.username).charAt(0).toUpperCase() : 'U';
+                let picHtml = (u.profilePic && u.profilePic.includes('http')) ? `<img src="${u.profilePic}" class="profile-pic ${avatarClass}">` : `<div class="profile-pic ${avatarClass}" style="display:flex; align-items:center; justify-content:center; font-size:35px; color:#000;">${initial}</div>`;
+
+                contentDiv.innerHTML = `
+                    <div class="profile-header">
+                        <i class="fas fa-ellipsis-v menu-icon-top-left" onclick="openProfileMenu()"></i>
+                        <i class="fas fa-wallet wallet-icon-top" onclick="openWallet()"></i>
+                        ${picHtml}
+                        <h2 style="font-size:22px; margin-bottom:5px;">@${safeStr(u.username)} ${badge}</h2>
+                        <p style="color:var(--muted-text); font-size:14px; margin-bottom:15px;">${safeStr(u.bio) || ''}</p>
+                        <div class="profile-stats">
+                            <div class="profile-stat-item"><strong id="postCount">0</strong><span>Posts</span></div>
+                            <div class="profile-stat-item" onclick="openFollowList('Followers')"><strong>${(u.followersArray || []).length}</strong><span>Followers</span></div>
+                            <div class="profile-stat-item" onclick="openFollowList('Following')"><strong>${(u.following || []).length}</strong><span>Following</span></div>
+                        </div>
+                        <button class="edit-profile-btn" onclick="openEditProfile()">Edit Profile</button>
+                    </div>
+                    <div class="profile-tabs">
+                        <div class="profile-tab active" onclick="switchProfileTab('posts', this)"><i class="fas fa-border-all"></i></div>
+                        <div class="profile-tab" onclick="switchProfileTab('saved', this)"><i class="fas fa-bookmark"></i></div>
+                    </div>
+                    <div class="profile-grid" id="profileVideosGrid"></div>`;
+                loadProfileVideos('posts');
+            });
+        }
+
+        function switchProfileTab(type, el) { document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active')); el.classList.add('active'); loadProfileVideos(type); }
+        function loadProfileVideos(type) {
+            const grid = document.getElementById('profileVideosGrid'); grid.innerHTML = '<p style="text-align:center; padding:20px; grid-column:span 3; color:var(--primary);">Loading...</p>';
+            let query = db.collection('videos');
+            if (type === 'posts') { query = query.where('userId', '==', currentUser.id); } 
+            else { const savedIds = currentUser.saved || []; if (savedIds.length === 0) { grid.innerHTML = '<p style="text-align:center; padding:20px; grid-column:span 3; color:#888;">No saved videos.</p>'; return; } query = query.limit(10); }
+
+            query.get().then(snapshot => {
+                grid.innerHTML = '';
+                if (snapshot.empty) { grid.innerHTML = '<p style="text-align:center; padding:20px; grid-column:span 3; color:#888;">No videos found.</p>'; return; }
+                if (type === 'posts') { document.getElementById('postCount').innerText = snapshot.size; }
+                snapshot.forEach(doc => {
+                    const vid = doc.data();
+                    const posterUrl = getThumbUrl(vid.video_url) || 'https://via.placeholder.com/400x800?text=Loading...';
+                    grid.innerHTML += `<div class="grid-item" onclick="openExploreVideo('${doc.id}', '${vid.video_url}', '${safeStr(vid.username)}', '${safeStr(vid.caption)}')"><img src="${posterUrl}" loading="lazy" style="width:100%;height:100%;object-fit:cover;"><div class="grid-item-stats"><i class="fas fa-play"></i> ${vid.likes_count || 0}</div></div>`;
+                });
+            });
+        }
+
+        function initObserver() {
+            const videos = document.querySelectorAll('.video-player');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    const video = entry.target;
+                    const playBtn = video.parentElement.querySelector('.center-play-btn');
+                    if (entry.isIntersecting) { 
+                        if (!video.src && video.dataset.src) {
+                            video.src = video.dataset.src;
+                            video.load(); 
+                        }
+                        video.play().catch(e => { if(playBtn) playBtn.style.display = 'block'; }); 
+                    } 
+                    else { 
+                        video.pause(); 
+                        if(playBtn) playBtn.style.display = 'none'; 
+                    }
+                });
+            }, { threshold: 0.6 });
+            videos.forEach(video => observer.observe(video));
+        }
+    </script>
+      <!-- ======================================================== -->
+    <!-- SHORTCUT MEGA FIX (PASTE JUST BEFORE </body> TAG) -->
+    <!-- ======================================================== -->
+    <style>
+        /* Global Play Overlay for Black Screen Fix */
+        #globalPlayOverlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.95); z-index: 99998;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            transition: opacity 0.4s ease;
+        }
+        .tap-pulse {
+            font-size: 80px; color: var(--primary); cursor: pointer;
+            box-shadow: 0 0 30px rgba(255,215,0,0.6); border-radius: 50%;
+            animation: pulsePlay 1.5s infinite alternate;
+        }
+        @keyframes pulsePlay { 0% { transform: scale(0.9); box-shadow: 0 0 10px rgba(255,215,0,0.3); } 100% { transform: scale(1.1); box-shadow: 0 0 40px rgba(255,215,0,0.8); } }
+
+        /* Auth Modal Tabs */
+        .auth-tab { flex: 1; text-align: center; padding: 12px; font-weight: bold; cursor: pointer; border-bottom: 2px solid transparent; transition: 0.3s; }
+        .auth-tab.active { color: var(--primary); border-bottom: 2px solid var(--primary); }
+        .auth-tab.inactive { color: #888; }
+    </style>
+
+    <script>
+        (function() {
+
+            // ==========================================
+            // 2. PASSWORD LOGIN / SIGNUP (FIREBASE AUTH)
+            // ==========================================
+            
+            // Inject Firebase Auth SDK
+            if(typeof firebase.auth === 'undefined') {
+                const script = document.createElement('script');
+                script.src = "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js";
+                document.head.appendChild(script);
+            }
+
+            // Override Auth UI
+            setTimeout(() => {
+                const authContent = document.querySelector('#authModal .full-content');
+                if(authContent) {
+                    authContent.innerHTML = `
+                        <div style="display:flex; width:100%; gap:10px; margin-bottom:20px; border-bottom:1px solid #333;">
+                            <div id="tabSignup" class="auth-tab active" onclick="switchAuthTab('signup')">Sign Up</div>
+                            <div id="tabLogin" class="auth-tab inactive" onclick="switchAuthTab('login')">Log In</div>
+                        </div>
+
+                        <div id="signupSection" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+                            <div style="width: 90px; height: 90px; border-radius: 50%; background: var(--input-bg); border: 2px solid var(--primary); position: relative; cursor: pointer; margin-bottom: 20px;" onclick="document.getElementById('profilePicInput').click()">
+                                <img id="profilePicPreview" src="https://via.placeholder.com/100" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
+                                <i class="fas fa-camera" style="position: absolute; bottom: 0; right: 0; background: var(--primary); color: #000; padding: 6px; border-radius: 50%; font-size: 12px;"></i>
+                            </div>
+                            <input type="file" id="profilePicInput" accept="image/*" style="display: none;" onchange="previewProfilePic(this, 'profilePicPreview')">
+                            <input type="text" id="authUsername" class="custom-input" placeholder="Enter Username (e.g. sudipta)">
+                            <input type="password" id="authPassword" class="custom-input" placeholder="Set Password (e.g. 0953)">
+                            <textarea id="authBio" class="custom-input" placeholder="Write a short bio..."></textarea>
+                            <button class="primary-btn" onclick="handleNewAuth('signup')">Create Account</button>
+                        </div>
+
+                        <div id="loginSection" style="width:100%; display:none; flex-direction:column; align-items:center;">
+                            <i class="fas fa-user-circle" style="font-size:70px; color:var(--primary); margin-bottom:25px;"></i>
+                            <input type="text" id="loginUsername" class="custom-input" placeholder="Enter Username (e.g. sudipta)">
+                            <input type="password" id="loginPassword" class="custom-input" placeholder="Enter Password">
+                            <button class="primary-btn" onclick="handleNewAuth('login')">Log In</button>
+                        </div>
+                    `;
+                }
+            }, 1000);
+
+            window.switchAuthTab = (tab) => {
+                if(tab === 'signup') {
+                    document.getElementById('signupSection').style.display = 'flex';
+                    document.getElementById('loginSection').style.display = 'none';
+                    document.getElementById('tabSignup').className = "auth-tab active";
+                    document.getElementById('tabLogin').className = "auth-tab inactive";
+                } else {
+                    document.getElementById('signupSection').style.display = 'none';
+                    document.getElementById('loginSection').style.display = 'flex';
+                    document.getElementById('tabLogin').className = "auth-tab active";
+                    document.getElementById('tabSignup').className = "auth-tab inactive";
+                }
+            };
+
+            window.handleNewAuth = async (type) => {
+                if(typeof firebase.auth === 'undefined') return showToast("Loading System, Please wait...");
+                showLoader();
+                const auth = firebase.auth();
+                
+                if (type === 'signup') {
+                    const user = document.getElementById('authUsername').value.trim();
+                    const pass = document.getElementById('authPassword').value.trim();
+                    const bio = document.getElementById('authBio').value.trim();
+                    if (!user || !pass) { hideLoader(); return showToast("Username & Password required!"); }
+                    
+                    const email = `${user.toLowerCase().replace(/\s/g, '')}@pikko.com`; // Creates unique email internally
+                    try {
+                        await auth.createUserWithEmailAndPassword(email, pass);
+                        
+                        // Upload Image
+                        let profileUrl = "https://via.placeholder.com/100";
+                        if (typeof tempProfileFile !== 'undefined' && tempProfileFile) { 
+                            try { profileUrl = await uploadToCloudinary(tempProfileFile); } catch (e) {} 
+                        }
+                        
+                        const userData = { username: user, bio: bio, profilePic: profileUrl, following: [], followersArray: [], pCoins: 50, earnedCoins: 0, videos: 0, totalViews: 0, verification: 'none', createdAt: firebase.firestore.FieldValue.serverTimestamp() };
+                        const userRef = await db.collection('users').add(userData);
+                        userData.id = userRef.id;
+                        saveUserData(userData);
+                        
+                        hideLoader(); closeAuthModal(); showToast("Account Created Successfully!"); renderHome();
+                    } catch (e) { hideLoader(); showToast("Username already exists or Password too short!"); }
+
+                } else if (type === 'login') {
+                    const user = document.getElementById('loginUsername').value.trim();
+                    const pass = document.getElementById('loginPassword').value.trim();
+                    if (!user || !pass) { hideLoader(); return showToast("Username & Password required!"); }
+                    
+                    const email = `${user.toLowerCase().replace(/\s/g, '')}@pikko.com`;
+                    try {
+                        await auth.signInWithEmailAndPassword(email, pass);
+                        // Fetch the user data from Database
+                        const snap = await db.collection('users').where('username', '==', user).get();
+                        if(!snap.empty) {
+                            const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                            saveUserData(userData);
+                            hideLoader(); closeAuthModal(); showToast("Logged in successfully!"); renderHome();
+                        } else {
+                            hideLoader(); showToast("Profile data missing!");
+                        }
+                    } catch(e) { hideLoader(); showToast("Wrong Username or Password!"); }
+                }
+            };
+
+            // ==========================================
+            // 3. PROFILE PICTURE VISIBILITY GLOBALLY
+            // ==========================================
+            
+            // Override the Edit Profile Function to sync profile picture across all videos
+            const originalSaveEditedProfile = 
+window.saveEditedProfile = async () => {
+    let u = getUserData();
+    const username = document.getElementById('editUsername').value.trim(); 
+    const bio = document.getElementById('editBio').value.trim();
+    if (!username) return showToast("Username required!");
+    
+    showLoader();
+    let profileUrl = u.profilePic;
+    if (typeof tempProfileFile !== 'undefined' && tempProfileFile) { 
+        try { profileUrl = await uploadToCloudinary(tempProfileFile); } catch (e) {} 
+    }
+    
+    u.username = username; u.bio = bio; u.profilePic = profileUrl;
+    
+    try {
+        await db.collection('users').doc(u.id).update({ username, bio, profilePic: profileUrl });
+        
+        // MEGA FIX: Update Profile Pic on all previously uploaded videos!
+        db.collection('videos').where('userId', '==', u.id).get().then(snap => {
+            snap.forEach(v => { v.ref.update({ userPic: profileUrl, username: username }); });
+        });
+
+        saveUserData(u);
+        
+        // নতুন যোগ করা লাইন: প্রোফাইল বা ছবি আপডেট হলে ক্যাশ ডিলিট করে দেবে
+        localStorage.removeItem('pikko_video_cache'); 
+
+        hideLoader(); document.getElementById('editProfileModal').style.display = 'none'; 
+        showToast("Profile & Videos Updated!"); renderProfile();
+    } catch (e) { hideLoader(); showToast("Update failed!"); }
+};
+
+            // Auto-fallback for broken images (Ensures a clean UI if Cloudinary fails)
+            setInterval(() => {
+                document.querySelectorAll('.video-avatar-container img, .profile-pic').forEach(img => {
+                    img.onerror = function() {
+                        if(!this.classList.contains('fallback-applied')) {
+                            this.classList.add('fallback-applied');
+                            this.outerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--primary);color:#000;font-weight:bold;font-size:20px;">U</div>`;
+                        }
+                    };
+                });
+            }, 2000);
+
         })();
     </script>
+      <!-- ======================================================== -->
+    <!-- ADVANCED BLACK SCREEN FIX (PASTE JUST BEFORE </body> TAG) -->
+    <!-- ======================================================== -->
+    <style>
+        /* ভিডিও প্লে হওয়ার আগে কালো স্ক্রিন লুকাতে opacity ব্যবহার */
+        .video-player {
+            opacity: 0 !important;
+            transition: opacity 0.2s ease-in-out;
+        }
+        /* ভিডিও প্রস্তুত হলে দৃশ্যমান হবে */
+        .video-player.ready {
+            opacity: 1 !important;
+        }
+        /* ভিডিওর কন্টেইনারে পোস্টার দেখানোর ব্যবস্থা */
+        .video-card {
+            background-color: #000;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+    </style>
+
+    <script>
+        (function() {
+            function advancedVideoFix(video) {
+                if(!video.dataset.advancedFixed) {
+                    
+                    // পোস্টার ইমেজটি কন্টেইনারের ব্যাকগ্রাউন্ড হিসেবে সেট করা (যাতে ভিডিওর opacity 0 থাকলেও পেছনের ছবি দেখা যায়)
+                    let card = video.closest('.video-card');
+                    let poster = video.getAttribute('poster');
+                    if(card && poster) {
+                        card.style.backgroundImage = `url('${poster}')`;
+                    }
+
+                    // ভিডিও যখন বাস্তবে প্লে হওয়া শুরু করবে, তখন opacity 1 করে দেওয়া
+                    video.addEventListener('playing', () => {
+                        video.classList.add('ready');
+                    });
+
+                    // ইউজার স্ক্রল করে চলে গেলে আবার আগের অবস্থায় ফিরিয়ে নেওয়া
+                    video.addEventListener('pause', () => {
+                        if (video.currentTime === 0) {
+                            video.classList.remove('ready');
+                        }
+                    });
+
+                    // ডেটা লোড হলে সাময়িক ফ্রেম পুশ করার চেষ্টা 
+                    video.addEventListener('loadeddata', () => {
+                        if (video.currentTime === 0) video.currentTime = 0.001; 
+                    });
+
+                    video.dataset.advancedFixed = 'true';
+                }
+            }
+
+            // শুরুতে থাকা ভিডিওগুলো ফিক্স করা
+            document.querySelectorAll('.video-player').forEach(advancedVideoFix);
+
+            // স্ক্রল করার পর নতুন আসা ভিডিওগুলো ফিক্স করা
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) {
+                            if (node.classList && node.classList.contains('video-player')) {
+                                advancedVideoFix(node);
+                            } else {
+                                const newVideos = node.querySelectorAll ? node.querySelectorAll('.video-player') : [];
+                                newVideos.forEach(advancedVideoFix);
+                            }
+                        }
+                    });
+                });
+            });
+
+            // mainContent কন্টেইনারের ভেতরে নজর রাখা
+            const feedContainer = document.getElementById('mainContent');
+            if (feedContainer) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
+        })();
+    </script>
+
 </body>
 </html>
