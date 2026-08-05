@@ -1801,45 +1801,92 @@
    async function startVideoUpload() {
     if (!selectedFile) return showToast("No video selected");
     const caption = document.getElementById('uploadCaption').value;
-    closeUploadPage(); showLoader();
-
-    const fileName = 'videos/' + Date.now() + '_' + selectedFile.name.replace(/[^a-zA-Z0-9.]/g, "");
+    closeUploadPage(); 
+    showLoader();
 
     try {
-        const res = await fetch('https://pikkoshorts-cache.sudiptak503.workers.dev/', {
+        let activeIndex = 0;
+        let cloudName = "dtzjo3zdp";
+        let presetName = "ml_default";
+        let accounts = [];
+
+        // ১. ফায়ারবেস থেকে ডেটা রিড করা
+        const configDoc = await db.collection('settings').doc('storage_config').get();
+        
+        if (configDoc.exists) {
+            let config = configDoc.data();
+            activeIndex = (config.active_index !== undefined) ? config.active_index : 0;
+            accounts = config.accounts || [];
+
+            if (accounts && accounts[activeIndex]) {
+                if (accounts[activeIndex].cloud_name) cloudName = accounts[activeIndex].cloud_name.trim();
+                if (accounts[activeIndex].preset) presetName = accounts[activeIndex].preset.trim();
+            }
+        }
+
+        // ২. স্টোরেজ অটো-সুইচ চেক (৯০% লিমিট পার হলে)
+        let currentAcc = accounts[activeIndex] || { used_bytes: 0, limit_bytes: 26843545600 };
+        
+        if (accounts.length > 0 && configDoc.exists && configDoc.data().auto_switch) {
+            if (currentAcc.used_bytes >= currentAcc.limit_bytes * 0.90) {
+                activeIndex = (activeIndex + 1) % accounts.length;
+                currentAcc = accounts[activeIndex];
+                
+                if (currentAcc.cloud_name) cloudName = currentAcc.cloud_name.trim();
+                if (currentAcc.preset) presetName = currentAcc.preset.trim();
+                
+                await db.collection('settings').doc('storage_config').update({ active_index: activeIndex });
+                showToast(`Auto-switched to Account ${activeIndex + 1}`);
+            }
+        }
+
+        // ৩. ক্লাউডিনারিতে আপলোড
+        const formData = new FormData();
+        formData.append('file', selectedFile, 'pikko_video.mp4'); 
+        formData.append('upload_preset', presetName);
+
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
             method: 'POST',
-            headers: {
-                'X-File-Name': fileName,
-                'Content-Type': selectedFile.type || 'video/mp4'
-            },
-            body: selectedFile
+            body: formData
+        });
+
+        const uploadData = await uploadRes.json();
+
+        if (!uploadRes.ok) {
+            alert(`Upload Failed!\nCloud: "${cloudName}"\nPreset: "${presetName}"\nReason: ${uploadData.error ? uploadData.error.message : "Unknown Error"}`);
+            throw new Error("Cloudinary upload failed");
+        }
+
+        // ৪. ইউসেজ কাউন্টারে ফাইলের সাইজ যোগ করা
+        if (accounts[activeIndex]) {
+            accounts[activeIndex].used_bytes = (accounts[activeIndex].used_bytes || 0) + selectedFile.size;
+            await db.collection('settings').doc('storage_config').update({ accounts: accounts });
+        }
+
+        // ৫. ডেটাবেসে ভিডিও সেভ
+        await db.collection('videos').add({
+            video_url: uploadData.secure_url, 
+            caption: caption || '', 
+            username: currentUser.username, 
+            userId: currentUser.id, 
+            userPic: currentUser.profilePic || '', 
+            bio: currentUser.bio || '', 
+            likes_count: 0, comment_count: 0, views_count: 0, 
+            verification: currentUser.verification, 
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
 
         hideLoader();
-        if (res.ok) {
-            const data = await res.json();
-            await db.collection('videos').add({
-                video_url: data.url, 
-                caption: caption || '', 
-                username: currentUser.username, 
-                userId: currentUser.id, 
-                userPic: currentUser.profilePic || '', 
-                bio: currentUser.bio || '', 
-                likes_count: 0, comment_count: 0, views_count: 0, 
-                verification: currentUser.verification, 
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            showToast("Uploaded Successfully!"); 
-            localStorage.removeItem('pikko_video_cache');
-            setTimeout(() => renderHome(), 1000);
-        } else { 
-            showToast("Upload failed."); 
-        }
-    } catch (e) { 
-        hideLoader(); 
-        showToast("Network error."); 
+        showToast("Uploaded Successfully!", "success"); 
+        localStorage.removeItem('pikko_video_cache'); 
+        setTimeout(() => renderHome(), 1000);
+
+    } catch (e) {
+        hideLoader();
+        console.error("Upload Error:", e);
+        showToast("Upload failed. Please try again.", "error");
     }
-}     
+}
 
         // ===== EXPLORE, SEARCH =====
         function renderExplore() {
@@ -2976,6 +3023,312 @@ window.saveEditedProfile = async () => {
                 window.location.reload();
             };
 
+        })();
+    </script>
+      <!-- ======================================================== -->
+    <!-- MEGA UPDATE: ADMIN STORAGE MANAGEMENT (PASTE JUST BEFORE </body> TAG) -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // 1. অ্যাডমিন প্যানেলে 'Storage' বাটন ডায়নামিক ভাবে যুক্ত করা
+            const checkStorageBtnInterval = setInterval(() => {
+                const adminGrid = document.querySelector('#adminPanelModal .full-content div:first-child');
+                if(adminGrid && !document.getElementById('adminStorageBtn')) {
+                    
+                    const storageBtn = document.createElement('div');
+                    storageBtn.id = 'adminStorageBtn';
+                    storageBtn.className = 'action-btn';
+                    storageBtn.style.cssText = 'background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333; cursor:pointer;';
+                    storageBtn.innerHTML = '<i class="fas fa-database" style="color:#00BCD4; font-size:24px; margin-bottom:5px;"></i><span>Storage</span>';
+                    storageBtn.onclick = () => window.loadAdminStorage();
+                    
+                    adminGrid.appendChild(storageBtn);
+                    clearInterval(checkStorageBtnInterval);
+                }
+            }, 1000);
+
+            // 2. স্টোরেজ লোড এবং কন্ট্রোল করার ফাংশন
+            window.loadAdminStorage = function() {
+                document.getElementById('adminSectionTitle').innerText = 'Cloudinary Storage Status';
+                let log = document.getElementById('adminActivityLog');
+                log.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size:30px; color:var(--primary);"></i><br><br>Loading Storage...</div>';
+
+                db.collection('settings').doc('storage_config').get().then(doc => {
+                    if(!doc.exists) { 
+                        log.innerHTML = '<p style="color:#F44336; text-align:center;">Storage config missing in database!</p>'; 
+                        return; 
+                    }
+                    
+                    let config = doc.data();
+                    
+                    let html = `
+                        <div style="background:var(--input-bg); padding:15px; border-radius:10px; border:1px solid var(--border); margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                            <span style="font-weight:bold; color:#fff;">Auto-Switch at 90%</span>
+                            <label style="position:relative; display:inline-block; width:50px; height:24px;">
+                                <input type="checkbox" id="autoSwitchToggle" ${config.auto_switch ? 'checked' : ''} onchange="window.toggleAutoSwitch(this.checked)" style="opacity:0; width:0; height:0;">
+                                <span style="position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background-color:${config.auto_switch ? '#4CAF50' : '#ccc'}; transition:.4s; border-radius:24px;">
+                                    <span style="position:absolute; content:''; height:16px; width:16px; left:${config.auto_switch ? '28px' : '4px'}; bottom:4px; background-color:white; transition:.4s; border-radius:50%;"></span>
+                                </span>
+                            </label>
+                        </div>
+                    `;
+
+                    config.accounts.forEach((acc, index) => {
+                        const usedMB = (acc.used_bytes / (1024 * 1024)).toFixed(2);
+                        const limitGB = (acc.limit_bytes / (1024 * 1024 * 1024)).toFixed(0);
+                        const percent = ((acc.used_bytes / acc.limit_bytes) * 100).toFixed(1);
+                        const isActive = config.active_index === index;
+                        const barColor = percent > 90 ? '#F44336' : (percent > 70 ? '#FF9800' : '#4CAF50');
+
+                        html += `
+                            <div style="background:var(--input-bg); padding:15px; margin-bottom:10px; border-radius:12px; border: ${isActive ? '2px solid var(--primary)' : '1px solid #333'};">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom:10px;">
+                                    <strong style="color:#fff; font-size:16px;">Account ${index + 1} <br><span style="font-size:11px; color:#888;">(${acc.cloud_name})</span></strong>
+                                    ${isActive ? '<span style="color:#000; background:var(--primary); padding:3px 8px; border-radius:12px; font-size:11px; font-weight:bold;">ACTIVE</span>' : `<button onclick="window.switchStorageManual(${index})" style="background:#333; color:#fff; border:1px solid #555; padding:5px 10px; border-radius:5px; cursor:pointer; font-size:12px;">Switch</button>`}
+                                </div>
+                                <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; margin-bottom:5px;">
+                                    <span>Used: ${usedMB} MB</span>
+                                    <span>Total: ${limitGB} GB</span>
+                                </div>
+                                <div style="background: #222; height: 10px; border-radius: 5px; overflow: hidden; border:1px solid #000;">
+                                    <div style="width: ${percent}%; background: ${barColor}; height: 100%; transition: width 0.3s;"></div>
+                                </div>
+                                <div style="text-align:right; font-size:11px; color:${barColor}; margin-top:5px; font-weight:bold;">${percent}% Used</div>
+                            </div>
+                        `;
+                    });
+
+                    log.innerHTML = html;
+                });
+            };
+
+            // ৩. ম্যানুয়ালি স্টোরেজ বদলানোর ফাংশন
+            window.switchStorageManual = function(index) {
+                db.collection('settings').doc('storage_config').update({ active_index: index }).then(() => {
+                    showToast(`Manually switched to Account ${index + 1}`, 'success');
+                    window.loadAdminStorage();
+                });
+            };
+
+            // ৪. অটো-সুইচ অন/অফ করার ফাংশন
+            window.toggleAutoSwitch = function(status) {
+                db.collection('settings').doc('storage_config').update({ auto_switch: status }).then(() => {
+                    showToast(status ? 'Auto-Switch Enabled' : 'Auto-Switch Disabled', status ? 'success' : 'warning');
+                    window.loadAdminStorage();
+                });
+            };
+        })();
+    </script>
+      <!-- ======================================================== -->
+    <!-- MEGA SHORTCUT: VIDEO DELETE & ADMIN VIDEO MANAGER -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // ১. অ্যাডমিন প্যানেলে 'All Videos' বাটন যুক্ত করা
+            const checkAdminVidInterval = setInterval(() => {
+                const adminGrid = document.querySelector('#adminPanelModal .full-content div:first-child');
+                if(adminGrid && !document.getElementById('adminAllVideosBtn')) {
+                    const vidBtn = document.createElement('div');
+                    vidBtn.id = 'adminAllVideosBtn';
+                    vidBtn.className = 'action-btn';
+                    vidBtn.style.cssText = 'background:#1a1a1a; padding:15px; border-radius:10px; border:1px solid #333; cursor:pointer;';
+                    vidBtn.innerHTML = '<i class="fas fa-video" style="color:#E91E63; font-size:24px; margin-bottom:5px;"></i><span>All Videos</span>';
+                    vidBtn.onclick = () => window.loadAdminVideos();
+                    adminGrid.appendChild(vidBtn);
+                    clearInterval(checkAdminVidInterval);
+                }
+            }, 1000);
+
+            // ২. অ্যাডমিন প্যানেলে ভিডিও লিস্ট লোড করার ফাংশন
+            window.loadAdminVideos = function() {
+                document.getElementById('adminSectionTitle').innerText = 'Manage All Videos';
+                let log = document.getElementById('adminActivityLog');
+                log.innerHTML = '<div style="text-align:center; padding: 20px;"><i class="fas fa-spinner fa-spin" style="font-size:30px; color:var(--primary);"></i><br><br>Loading Videos...</div>';
+
+                db.collection('videos').orderBy('createdAt', 'desc').get().then(snap => {
+                    log.innerHTML = '';
+                    if(snap.empty) { log.innerHTML = '<p style="text-align:center; color:#888;">No videos found.</p>'; return; }
+                    
+                    snap.forEach(doc => {
+                        let v = doc.data();
+                        let thumb = v.video_url ? v.video_url.replace('.mp4', '.jpg') : 'https://via.placeholder.com/50';
+                        log.innerHTML += `
+                            <div style="background:var(--input-bg); padding:10px; border-radius:10px; margin-bottom:10px; border:1px solid #333; display:flex; align-items:center; gap:10px;">
+                                <img src="${thumb}" style="width:50px; height:70px; object-fit:cover; border-radius:5px;">
+                                <div style="flex:1; overflow:hidden;">
+                                    <div style="font-weight:bold; font-size:14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">@${safeStr(v.username)}</div>
+                                    <div style="font-size:11px; color:#888;">${safeStr(v.caption)}</div>
+                                    <div style="font-size:10px; color:var(--primary); margin-top:3px;"><i class="fas fa-eye"></i> ${v.views_count||0} | <i class="fas fa-heart"></i> ${v.likes_count||0}</div>
+                                </div>
+                                <button style="background:#F44336; color:#fff; border:none; padding:12px; border-radius:5px; cursor:pointer;" onclick="window.deleteGlobalVideo('${doc.id}', this)">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                });
+            };
+
+            // ৩. ভিডিও ডিলিট করার গ্লোবাল ফাংশন
+            window.deleteGlobalVideo = function(videoId, btnElement) {
+                showProConfirm("Delete Video?", "This video will be permanently removed from the app and database.", () => {
+                    showLoader();
+                    db.collection('videos').doc(videoId).delete().then(() => {
+                        showToast("Video Deleted Successfully!", "success");
+                        localStorage.removeItem('pikko_video_cache');
+                        
+                        // UI থেকে ভিডিওর কার্ড বা লিস্ট সরিয়ে দেওয়া
+                        if (btnElement) {
+                            let container = btnElement.closest('.video-card') || btnElement.closest('div[style*="background:var(--input-bg)"]');
+                            if (container) container.remove();
+                        }
+                        
+                        // যদি ইউজার নিজের প্রোফাইলে ফুলস্ক্রিন প্লেয়ারে থাকে, তবে প্লেয়ার বন্ধ করে প্রোফাইল রিফ্রেশ করা
+                        const modal = document.getElementById('videoPlayerModal');
+                        if (modal && modal.style.display === 'flex') {
+                            window.closeExploreVideo();
+                            window.renderProfile(); 
+                        }
+
+                        hideLoader();
+                    }).catch(err => {
+                        showToast("Error deleting video", "error");
+                        hideLoader();
+                    });
+                });
+            };
+
+            // ৪. ইউজারের নিজের প্রোফাইল থেকে ভিডিও ডিলিট করার অপশন (ওভাররাইড)
+            window.openExploreVideo = function(id, url, user, cap) {
+                const modal = document.getElementById('videoPlayerModal'); 
+                const container = document.getElementById('exploreVideoContainer');
+                
+                let u = window.getUserData ? window.getUserData() : null;
+                
+                // ইউজার নিজের ভিডিও ওপেন করলে লাল রঙের Delete বাটন দেখতে পাবে
+                let deleteBtnHtml = (u && u.username === user) ? 
+                    `<div class="action-btn" onclick="window.deleteGlobalVideo('${id}', this)" style="color:#F44336; margin-top:15px;">
+                        <i class="fas fa-trash" style="color:#F44336;"></i><span>Delete</span>
+                    </div>` : '';
+
+                container.innerHTML = `
+                    <div class="video-card">
+                        <video class="video-player" src="${url}" loop playsinline autoplay onclick="this.paused?this.play():this.pause()"></video>
+                        <div class="right-sidebar">
+                            <div class="action-btn" onclick="toggleLike('${id}')"><i class="fas fa-heart"></i><span>Like</span></div>
+                            <div class="action-btn" onclick="openComments('${id}')"><i class="fas fa-comment-dots"></i><span>Comment</span></div>
+                            ${deleteBtnHtml}
+                        </div>
+                        <div class="video-overlay">
+                            <h3>@${safeStr(user)}</h3>
+                            <p>${safeStr(cap)}</p>
+                        </div>
+                    </div>`;
+                modal.style.display = 'flex';
+            };
+
+            // ৫. হোম ফিডে ইউজারের নিজের ভিডিওতে ডিলিট বাটন যোগ করা (ওভাররাইড)
+            const originalRenderHomeFeed = window.renderHomeFeed;
+            window.renderHomeFeed = function(videos, tab) {
+                originalRenderHomeFeed(videos, tab); // আগের অরিজিনাল কোড রান হবে
+                
+                let u = window.getUserData ? window.getUserData() : null;
+                if(!u) return;
+
+                // হোম ফিড লোড হওয়ার পর ইউজারের নিজের ভিডিও খুঁজবে এবং ডিলিট অপশন বসাবে
+                setTimeout(() => {
+                    videos.forEach(vid => {
+                        if (vid.userId === u.id) {
+                            const rightSidebar = document.querySelector(`#vid_${vid.id}`)?.parentElement.querySelector('.right-sidebar');
+                            if (rightSidebar && !rightSidebar.querySelector('.fa-trash')) {
+                                const delBtn = document.createElement('div');
+                                delBtn.className = 'action-btn';
+                                delBtn.style.color = '#F44336';
+                                delBtn.innerHTML = '<i class="fas fa-trash" style="color:#F44336;"></i><span>Delete</span>';
+                                delBtn.onclick = function() { window.deleteGlobalVideo(vid.id, this); };
+                                rightSidebar.appendChild(delBtn);
+                            }
+                        }
+                    });
+                }, 500);
+            };
+        })();
+    </script>
+      <!-- ======================================================== -->
+    <!-- MEGA SHORTCUT: PROFESSIONAL PERMISSIONS ONBOARDING -->
+    <!-- ======================================================== -->
+    <script>
+        (function() {
+            // ১. প্রফেশনাল পারমিশন UI তৈরি করা (HTML Inject)
+            const permissionHTML = `
+                <div id="proPermissionModal" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.95); z-index: 9999999; justify-content: center; align-items: center; padding: 20px; backdrop-filter: blur(10px);">
+                    <div style="background: var(--secondary-bg); border: 1px solid #333; border-radius: 20px; padding: 30px 20px; text-align: center; max-width: 350px; width: 100%; box-shadow: 0 20px 50px rgba(0,0,0,0.8); animation: slideUp 0.4s ease;">
+                        <i class="fas fa-shield-alt" style="font-size: 55px; color: var(--primary); margin-bottom: 15px; text-shadow: 0 0 20px rgba(255,215,0,0.4);"></i>
+                        <h2 style="color: #fff; margin-bottom: 10px; font-size: 22px;">App Permissions</h2>
+                        <p style="color: #aaa; font-size: 13px; line-height: 1.5; margin-bottom: 25px;">To provide you with the best short video experience, Pikko Shorts needs access to the following:</p>
+
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px; text-align: left; background: var(--input-bg); padding: 15px; border-radius: 12px; border: 1px solid #222;">
+                            <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(29, 161, 242, 0.1); display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-video" style="font-size: 18px; color: #1DA1F2;"></i>
+                            </div>
+                            <div>
+                                <strong style="color: #fff; font-size: 14px;">Camera & Mic</strong>
+                                <div style="color: #888; font-size: 11px; margin-top: 3px;">Required to record awesome videos.</div>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 25px; text-align: left; background: var(--input-bg); padding: 15px; border-radius: 12px; border: 1px solid #222;">
+                            <div style="width: 40px; height: 40px; border-radius: 50%; background: rgba(76, 175, 80, 0.1); display: flex; align-items: center; justify-content: center;">
+                                <i class="fas fa-images" style="font-size: 18px; color: #4CAF50;"></i>
+                            </div>
+                            <div>
+                                <strong style="color: #fff; font-size: 14px;">Photo & Media</strong>
+                                <div style="color: #888; font-size: 11px; margin-top: 3px;">Required to upload videos from album.</div>
+                            </div>
+                        </div>
+
+                        <button onclick="window.requestAppPermissions()" style="background: linear-gradient(90deg, var(--primary), #FFA500); color: #000; font-weight: bold; font-size: 16px; border: none; padding: 15px; width: 100%; border-radius: 12px; cursor: pointer; box-shadow: 0 4px 15px rgba(255,215,0,0.3);">Continue & Allow</button>
+                        <div style="margin-top: 15px; color: #666; font-size: 12px; cursor: pointer; font-weight: bold;" onclick="document.getElementById('proPermissionModal').style.display='none'">Not Now</div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', permissionHTML);
+
+            // ২. অ্যাপ লোড হওয়ার পর চেক করা পারমিশন দেওয়া আছে কি না
+            setTimeout(() => {
+                if(!localStorage.getItem('pikko_permissions_granted')) {
+                    document.getElementById('proPermissionModal').style.display = 'flex';
+                }
+            }, 2500); // স্প্ল্যাশ স্ক্রিন যাওয়ার পর আসবে
+
+            // ৩. পারমিশন চাওয়ার আসল ফাংশন
+            window.requestAppPermissions = async function() {
+                try {
+                    // এটি ব্রাউজার বা ডিভাইসের অরিজিনাল পারমিশন পপ-আপ নিয়ে আসবে
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                    
+                    // পারমিশন পেয়ে গেলে ক্যামেরা/মাইক সাথে সাথে বন্ধ করে দেওয়া (যাতে ব্যাকগ্রাউন্ডে না চলে)
+                    stream.getTracks().forEach(track => track.stop());
+
+                    // পারমিশন সাকসেসফুল হলে ব্রাউজারে সেভ করে রাখা
+                    localStorage.setItem('pikko_permissions_granted', 'true');
+                    document.getElementById('proPermissionModal').style.display = 'none';
+                    
+                    if(window.showToast) {
+                        window.showToast('Permissions Granted Successfully!', 'success');
+                    } else {
+                        alert("Permissions Granted Successfully!");
+                    }
+                } catch(err) {
+                    console.error("Permission Error:", err);
+                    if(window.showToast) {
+                        window.showToast('Permissions Denied. Features may not work.', 'error');
+                    } else {
+                        alert("Permissions Denied!");
+                    }
+                    document.getElementById('proPermissionModal').style.display = 'none';
+                }
+            };
         })();
     </script>
 </body>
